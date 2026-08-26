@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{{ band.name }} - Graffiti Wars{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  .band-banner {
+    height: 220px; border-radius: var(--radius); background-size: cover; background-position: center;
+    display: flex; align-items: flex-end; padding: 24px; position: relative;
+  }
+  .band-banner::before {
+    content: ""; position: absolute; inset: 0; border-radius: var(--radius);
+    background: linear-gradient(to top, rgba(11,11,16,0.85), rgba(11,11,16,0.2));
+  }
+  .band-banner > * { position: relative; z-index: 1; }
+  #bandMiniMap { height: 320px; border-radius: var(--radius); border: 1px solid var(--border); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container section">
+
+  <div class="band-banner mb-32" style="background-image:url('{{ band.banner_image.url if band.banner_image else band.reference_image.url }}')">
+    <div>
+      <div class="flex items-center gap-8">
+        <h1 style="font-size:36px">{{ band.name }}</h1>
+        {% if band.nationality_code and country_by_code.get(band.nationality_code) %}
+        <span style="font-size:28px" title="{{ country_by_code[band.nationality_code].hu if g.locale == 'hu' else country_by_code[band.nationality_code].en }}">{{ country_by_code[band.nationality_code].flag }}</span>
+        {% endif %}
+      </div>
+      <p style="color:#e8e6ee">
+        {{ t('band.founded_on', date=band.created_at.strftime("%Y.%m.%d")) }} -
+        {{ members | length }} {{ t('common.member') if members | length == 1 else t('common.members') }}
+      </p>
+    </div>
+  </div>
+
+  {% if current_user.is_authenticated %}
+    {% if current_user.band_id == band.id %}
+      <div class="flex gap-12 mb-32">
+        <a href="{{ url_for('chat.start_band', band_id=band.id) }}" class="btn btn-primary">{{ t('nav.chat') }}</a>
+        {% if is_leader %}
+        <a href="{{ url_for('bands.band_settings', band_id=band.id) }}" class="btn btn-secondary">{{ t('band.settings_button') }}</a>
+        {% endif %}
+        <form method="POST" action="{{ url_for('bands.leave_band') }}">
+          <button class="btn btn-secondary">{{ t('band.leave_button') }}</button>
+        </form>
+      </div>
+    {% elif current_user.is_civilian and band.join_policy == "open" %}
+      <form method="POST" action="{{ url_for('bands.join_band', band_id=band.id) }}" class="mb-32">
+        <button class="btn btn-primary">{{ t('band.join_button') }}</button>
+      </form>
+    {% elif current_user.is_civilian and band.join_policy == "request" %}
+      {% if own_pending_request %}
+        <p class="mb-32 text-muted">{{ t('band.request_pending') }}</p>
+      {% else %}
+        <form method="POST" action="{{ url_for('bands.request_join', band_id=band.id) }}" class="mb-32">
+          <button class="btn btn-primary">{{ t('band.request_join_button') }}</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+
+  {% if is_leader and band.join_policy == "request" %}
+  <div class="card mb-32">
+    <h2 style="font-size:16px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.requests_title') }}</h2>
+    {% for join_request in pending_requests %}
+    <div class="flex items-center justify-between gap-12 mb-8">
+      <a href="{{ url_for('profile.user_profile', username=join_request.user.username) }}">{{ join_request.user.username }}</a>
+      <div class="flex gap-8">
+        <form method="POST" action="{{ url_for('bands.approve_join_request', request_id=join_request.id) }}">
+          <button class="btn btn-success btn-sm">{{ t('band.approve_request') }}</button>
+        </form>
+        <form method="POST" action="{{ url_for('bands.reject_join_request', request_id=join_request.id) }}">
+          <button class="btn btn-danger btn-sm">{{ t('band.reject_request') }}</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted">{{ t('band.no_requests') }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if is_leader and band.join_policy == "invite" %}
+  <div class="card mb-32">
+    <h2 style="font-size:16px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.add_member_title') }}</h2>
+    <form method="POST" action="{{ url_for('bands.add_member', band_id=band.id) }}" class="flex gap-8">
+      <input type="text" name="username" placeholder="{{ t('band.add_member_placeholder') }}" required />
+      <button type="submit" class="btn btn-primary">{{ t('band.add_member_button') }}</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="grid grid-4 mb-32">
+    <div class="stat-card"><div class="stat-value" style="color:{{ band.color }}">{{ territory.area_km2 | round(2) if territory else 0 }} km2</div><div class="stat-label">{{ t('band.stat_area') }}</div></div>
+    <div class="stat-card"><div class="stat-value stat-cyan">{{ members | length }}</div><div class="stat-label">{{ t('band.stat_members') }}</div></div>
+    <div class="stat-card"><div class="stat-value stat-yellow">{{ total_approved }}</div><div class="stat-label">{{ t('band.stat_verified_points') }}</div></div>
+    <div class="stat-card">
+      <div class="stat-value stat-purple">
+        {% if band.join_policy == "open" %}{{ t('band.open_badge') }}{% elif band.join_policy == "request" %}{{ t('band.request_badge') }}{% else %}{{ t('band.invite_badge') }}{% endif %}
+      </div>
+      <div class="stat-label">{{ t('band.stat_joining_label') }}</div>
+    </div>
+  </div>
+
+  <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.map_title') }}</h2>
+  <div id="bandMiniMap" class="mb-32" data-init-map data-interactive="false" data-zoom="14" data-band-filter="{{ band.id }}"></div>
+
+  <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.landmarks_title') }}</h2>
+  {% if landmarks_by_category %}
+  <div class="grid grid-3 mb-32">
+    {% for category in landmark_categories %}
+    {% set items = landmarks_by_category.get(category, []) %}
+    <details class="card">
+      <summary style="cursor:pointer; font-weight:700">
+        {{ t('category.' + category) }}
+        <span class="badge badge-muted" style="margin-left:6px">{{ items | length }}</span>
+      </summary>
+      <div class="mt-16" style="margin-top:12px; max-height:200px; overflow-y:auto">
+        {% for landmark in items %}
+        <div class="text-muted" style="font-size:13px; padding:4px 0; border-bottom:1px solid var(--border)">
+          {{ landmark.name or t('band.landmark_unnamed') }}
+          <span style="opacity:0.6">({{ landmark.subtype }})</span>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted mb-32">{{ t('band.landmarks_empty') }}</p>
+  {% endif %}
+
+  <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.members_title') }}</h2>
+  <div class="card" style="padding:0">
+    <table>
+      <thead><tr><th>{{ t('band.table_user') }}</th><th>{{ t('band.table_joined') }}</th><th>{{ t('band.table_verified') }}</th><th>{{ t('band.table_role') }}</th>{% if is_leader %}<th>{{ t('admin.table_action') }}</th>{% endif %}</tr></thead>
+      <tbody>
+        {% for member in members %}
+        <tr>
+          <td><a href="{{ url_for('profile.user_profile', username=member.username) }}">{{ member.username }}</a></td>
+          <td>{{ member.band_joined_at.strftime("%Y.%m.%d") if member.band_joined_at else "-" }}</td>
+          <td>{{ approved_counts.get(member.id, 0) }}</td>
+          <td><span class="badge {{ 'badge-pink' if member.band_role == 'leader' else 'badge-muted' }}">{{ t('band.role_leader') if member.band_role == "leader" else t('band.role_member') }}</span></td>
+          {% if is_leader %}
+          <td>
+            {% if member.id != current_user.id %}
+            <form method="POST" action="{{ url_for('bands.kick_member', band_id=band.id, user_id=member.id) }}" onsubmit="return confirm('{{ t('band.confirm_kick') }}');">
+              <button class="btn btn-danger btn-sm">{{ t('band.kick_button') }}</button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}

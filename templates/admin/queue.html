@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.admin_queue') }} - Graffiti Wars{% endblock %}
+{% block content %}
+<div class="container section">
+  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-32">{{ t('admin.queue_title') }}</h1>
+
+  <div class="flex gap-16 mb-16">
+    <a href="{{ url_for('admin.queue') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_queue') }}</a>
+    <a href="{{ url_for('admin.users') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_users') }}</a>
+    <a href="{{ url_for('admin.bands') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_bands') }}</a>
+  </div>
+
+  <h2 style="font-size:18px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('admin.reports_title') }}</h2>
+  <div class="card" style="padding:0">
+    <table>
+      <thead><tr><th>{{ t('admin.table_tag') }}</th><th>{{ t('admin.table_reporter') }}</th><th>{{ t('admin.table_reason') }}</th><th>{{ t('admin.table_action') }}</th></tr></thead>
+      <tbody>
+        {% for report in open_reports %}
+        <tr>
+          <td>#{{ report.tag_point.id }} - {{ report.tag_point.band.name }}</td>
+          <td>{{ report.reported_by.username }}</td>
+          <td>{{ report.reason or "-" }}</td>
+          <td class="flex gap-8">
+            <form method="POST" action="{{ url_for('admin.resolve_report', report_id=report.id) }}">
+              <input type="hidden" name="action" value="remove_tag" />
+              <button class="btn btn-danger btn-sm">{{ t('admin.remove_tag') }}</button>
+            </form>
+            <form method="POST" action="{{ url_for('admin.resolve_report', report_id=report.id) }}">
+              <input type="hidden" name="action" value="dismiss" />
+              <button class="btn btn-secondary btn-sm">{{ t('admin.dismiss') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted">{{ t('admin.no_reports') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ profile_user.username }} - Graffiti Wars{% endblock %}
+{% block extra_head %}
+<style>
+  .profile-banner {
+    height: 180px;
+    border-radius: var(--radius);
+    background-size: cover;
+    background-position: center;
+    background-color: var(--bg-card);
+    margin-bottom: -56px;
+  }
+  .profile-header-row { position: relative; z-index: 1; padding: 0 8px; }
+  .profile-avatar-lg { border: 4px solid var(--bg); }
+  .crew-link { color: var(--pink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+  .crew-link:hover { color: var(--cyan); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container section">
+
+  {% if profile_user.banner_image %}
+  <div class="profile-banner mb-32" style="background-image:url('{{ profile_user.banner_image.url }}')"></div>
+  {% endif %}
+
+  <div class="flex items-center justify-between gap-16 mb-16 profile-header-row">
+    <div class="flex items-center gap-16">
+      <img class="avatar profile-avatar-lg" src="{{ profile_user.display_avatar_url }}"
+           width="96" height="96"
+           style="border-color:{{ profile_user.band.color if profile_user.band else 'var(--bg)' }}" />
+      <div>
+        <div class="flex items-center gap-8 mb-8">
+          <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800">{{ profile_user.username }}</h1>
+          {% if profile_user.nationality_code and country_by_code.get(profile_user.nationality_code) %}
+          <span style="font-size:22px" title="{{ country_by_code[profile_user.nationality_code].hu if g.locale == 'hu' else country_by_code[profile_user.nationality_code].en }}">{{ country_by_code[profile_user.nationality_code].flag }}</span>
+          {% endif %}
+          {% if profile_user.is_admin %}<span class="badge badge-purple">{{ t('profile.admin_badge') }}</span>{% endif %}
+          {% if profile_user.band_role == "leader" %}<span class="badge badge-pink">{{ t('profile.leader_badge') }}</span>{% endif %}
+        </div>
+        {% if profile_user.band %}
+        {% set band_link %}<a href="{{ url_for('bands.band_detail', band_id=profile_user.band.id) }}" class="crew-link">{{ profile_user.band.name }} &rarr;</a>{% endset %}
+        <p>{{ t('profile.member_of', band=band_link, date=profile_user.band_joined_at.strftime("%Y.%m.%d")) | safe }}</p>
+        {% else %}
+        <p>{{ t('profile.civilian') }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% if is_own_profile %}
+    <a href="{{ url_for('profile.edit_profile') }}" class="btn btn-secondary btn-sm">{{ t('profile.edit_button') }}</a>
+    {% elif profile_user.allow_direct_messages %}
+    <a href="{{ url_for('chat.start_direct', username=profile_user.username) }}" class="btn btn-primary btn-sm">{{ t('profile.message_button') }}</a>
+    {% endif %}
+  </div>
+
+  {% if profile_user.bio %}
+  <p class="mb-32" style="max-width:640px">{{ profile_user.bio }}</p>
+  {% endif %}
+
+  <div class="grid grid-3 mb-32">
+    <div class="stat-card"><div class="stat-value stat-pink">{{ approved }}</div><div class="stat-label">{{ t('profile.stat_approved') }}</div></div>
+    <div class="stat-card"><div class="stat-value stat-yellow">{{ contribution_percent }}%</div><div class="stat-label">{{ t('profile.stat_contribution') }}</div></div>
+    <div class="stat-card"><div class="stat-value stat-purple">{{ submitted }}</div><div class="stat-label">{{ t('profile.stat_submitted') }}</div></div>
+  </div>
+
+  <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('profile.recent_title') }}</h2>
+  <div class="flex gap-12" style="flex-wrap:wrap">
+    {% for tag in recent_tags %}
+    <div style="text-align:center">
+      <img src="{{ tag.photo_image.url }}" style="width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--border)" />
+      <div style="margin-top:4px">
+        <span class="badge {{ 'badge-success' if tag.status == 'approved' else ('badge-danger' if tag.status in ['rejected', 'removed'] else 'badge-muted') }}">{{ t('status.' + tag.status) }}</span>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted">{{ t('profile.no_tags_yet') }}</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ t('tag.processing_title') }} - Graffiti Wars{% endblock %}
+{% block extra_head %}
+<style>
+  .processing-wrap {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 120px 24px;
+  }
+  .spinner {
+    width: 56px; height: 56px; border-radius: 50%;
+    border: 4px solid var(--border); border-top-color: var(--pink);
+    animation: spin 0.9s linear infinite; margin-bottom: 24px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="processing-wrap">
+  <div class="spinner"></div>
+  <h1 style="font-size:22px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('tag.processing_title') }}</h1>
+  <p>{{ t('tag.processing_message') }}</p>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  setTimeout(() => {
+    fetch({{ url_for('tags.finalize') | tojson }}, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `image_id=${encodeURIComponent({{ image_id | tojson }})}&lat=${encodeURIComponent({{ lat | tojson }})}&lon=${encodeURIComponent({{ lon | tojson }})}`,
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.redirect_url) {
+          window.location = data.redirect_url;
+        }
+      });
+  }, 2200);
+</script>
+{% endblock %}

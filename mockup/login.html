@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Belepes - Graffiti Wars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .auth-layout {
+    min-height: calc(100vh - 61px);
+    display: grid;
+    grid-template-columns: 1fr 480px;
+  }
+  .auth-art {
+    background:
+      radial-gradient(circle at 20% 30%, rgba(255,46,108,0.25), transparent 45%),
+      radial-gradient(circle at 80% 70%, rgba(0,224,209,0.2), transparent 45%),
+      repeating-linear-gradient(135deg, #14141c, #14141c 24px, #1a1a24 24px, #1a1a24 48px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  .auth-art .quote {
+    max-width: 380px;
+    font-family: var(--font-display);
+    font-size: 30px;
+    line-height: 1.3;
+  }
+  .auth-form-side {
+    padding: 60px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-left: 1px solid var(--border);
+  }
+  .tabs { display: flex; gap: 8px; margin-bottom: 28px; background: var(--bg-elevated); padding: 4px; border-radius: var(--radius-sm); }
+  .tab-btn {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+  .tab-btn.active { background: var(--bg-card); color: var(--text); }
+  @media (max-width: 860px) {
+    .auth-layout { grid-template-columns: 1fr; }
+    .auth-art { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo"><a href="index.html" style="display:flex; align-items:center; gap:8px"><span>GRAFFITI</span><span class="dot">WARS</span></a></div>
+  <div></div>
+  <div></div>
+</nav>
+
+<div class="auth-layout">
+  <div class="auth-art">
+    <div class="quote">"A varos a mi vasznunk. A terkep a mi terepunk."</div>
+  </div>
+
+  <div class="auth-form-side">
+    <div class="tabs">
+      <div class="tab-btn active" data-tab-group="auth" data-tab="login" onclick="switchTab('auth','login')">Belepes</div>
+      <div class="tab-btn" data-tab-group="auth" data-tab="register" onclick="switchTab('auth','register')">Regisztracio</div>
+    </div>
+
+    <div data-tab-panel-group="auth" data-tab-panel="login">
+      <h2 style="font-size:24px; font-family:var(--font-body); font-weight:800" class="mb-24">Udv ujra!</h2>
+      <div class="field">
+        <label>E-mail cim</label>
+        <input type="email" placeholder="nev@pelda.hu" />
+      </div>
+      <div class="field mb-24">
+        <label>Jelszo</label>
+        <input type="password" placeholder="••••••••" />
+      </div>
+      <button class="btn btn-primary btn-block mb-16">Belepes</button>
+      <p class="text-center" style="font-size:13px">Elfelejtetted a jelszavad? <a href="#" style="color:var(--pink)">Allitsd vissza</a></p>
+    </div>
+
+    <div data-tab-panel-group="auth" data-tab-panel="register" style="display:none">
+      <h2 style="font-size:24px; font-family:var(--font-body); font-weight:800" class="mb-24">Csatlakozz</h2>
+      <div class="field">
+        <label>Felhasznalonev</label>
+        <input type="text" placeholder="pl. sprayqueen" />
+      </div>
+      <div class="field">
+        <label>E-mail cim</label>
+        <input type="email" placeholder="nev@pelda.hu" />
+      </div>
+      <div class="field mb-24">
+        <label>Jelszo</label>
+        <input type="password" placeholder="••••••••" />
+      </div>
+      <div class="card mb-24" style="padding:16px">
+        <label class="flex items-center gap-8" style="margin:0; cursor:pointer">
+          <input type="checkbox" style="width:auto" />
+          <span style="font-weight:400; color:var(--text)">Elfogadom, hogy a feltoltott tartalomert es annak jogszerusegeert kizarolag en felelek.</span>
+        </label>
+      </div>
+      <button class="btn btn-primary btn-block mb-16">Fiok letrehozasa</button>
+      <p class="text-center" style="font-size:13px">Regisztracio utan barmikor letrehozhatsz vagy csatlakozhatsz egy bandahoz - vagy maradhatsz civil nezo.</p>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

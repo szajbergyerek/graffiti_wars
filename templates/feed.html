@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.feed') }} - Graffiti Wars{% endblock %}
+{% block content %}
+<div class="container section" style="max-width:640px">
+  <h1 style="font-size:28px; font-family:var(--font-body); font-weight:800" class="mb-32">{{ t('nav.feed') }}</h1>
+
+  <div class="card" style="padding:0">
+    {% for event in events %}
+    <div class="flex items-center gap-12" style="padding:16px; border-bottom:1px solid var(--border)">
+      <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:{{ event.band.color if event.band else 'var(--purple)' }}"></div>
+      <div style="flex:1">
+        <div>{{ event.message }}</div>
+        <div class="text-muted" style="font-size:13px">{{ event.created_at.strftime("%Y.%m.%d %H:%M") }}</div>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted" style="padding:16px">{{ t('home.feed_empty') }}</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

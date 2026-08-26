@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.bands') }} - Graffiti Wars{% endblock %}
+{% block content %}
+<div class="container section">
+  <div class="flex justify-between items-center mb-32">
+    <h1 style="font-size:28px; font-family:var(--font-body); font-weight:800">{{ t('band.list_title') }}</h1>
+    {% if current_user.is_authenticated and current_user.is_civilian %}
+    <a href="{{ url_for('bands.create_band') }}" class="btn btn-primary">{{ t('band.new_button') }}</a>
+    {% endif %}
+  </div>
+
+  <form method="GET" id="bandFilterForm" class="card mb-24">
+    <div class="flex gap-12 mb-16">
+      <input type="text" name="q" value="{{ query_text }}" placeholder="{{ t('band.search_placeholder') }}" style="flex:1" />
+      <select name="sort" onchange="this.form.submit()">
+        <option value="newest" {{ "selected" if sort_key == "newest" else "" }}>{{ t('band.sort_newest') }}</option>
+        <option value="oldest" {{ "selected" if sort_key == "oldest" else "" }}>{{ t('band.sort_oldest') }}</option>
+        <option value="area" {{ "selected" if sort_key == "area" else "" }}>{{ t('band.sort_area') }}</option>
+        <option value="members" {{ "selected" if sort_key == "members" else "" }}>{{ t('band.sort_members') }}</option>
+      </select>
+      <select name="join_policy" onchange="this.form.submit()">
+        <option value="all" {{ "selected" if join_policy_filter == "all" else "" }}>{{ t('band.filter_all') }}</option>
+        <option value="open" {{ "selected" if join_policy_filter == "open" else "" }}>{{ t('band.open_badge') }}</option>
+        <option value="request" {{ "selected" if join_policy_filter == "request" else "" }}>{{ t('band.request_badge') }}</option>
+        <option value="invite" {{ "selected" if join_policy_filter == "invite" else "" }}>{{ t('band.invite_badge') }}</option>
+      </select>
+      <button type="submit" class="btn btn-secondary">{{ t('band.search_button') }}</button>
+    </div>
+    <div class="flex gap-8 items-center">
+      <span class="text-muted" style="font-size:13px">{{ t('band.scope_label') }}:</span>
+      <button type="button" class="btn btn-sm {{ 'btn-primary' if scope == 'global' else 'btn-secondary' }}" onclick="setBandScope('global')">{{ t('leaderboard.tab_global') }}</button>
+      <button type="button" class="btn btn-sm {{ 'btn-primary' if scope == 'national' else 'btn-secondary' }}" onclick="setBandScope('national')">{{ t('leaderboard.tab_national') }}</button>
+      <button type="button" class="btn btn-sm {{ 'btn-primary' if scope == 'local' else 'btn-secondary' }}" onclick="setBandScope('local')">{{ t('leaderboard.tab_local') }}</button>
+    </div>
+    <input type="hidden" name="scope" id="scopeInput" value="{{ scope }}" />
+    <input type="hidden" name="lat" id="latInput" value="{{ request.args.get('lat', '') }}" />
+    <input type="hidden" name="lon" id="lonInput" value="{{ request.args.get('lon', '') }}" />
+  </form>
+
+  <div class="grid grid-3">
+    {% for band in bands %}
+    <a href="{{ url_for('bands.band_detail', band_id=band.id) }}" class="card">
+      <div class="flex items-center gap-12 mb-16">
+        <div style="width:44px;height:44px;border-radius:10px;background:{{ band.color }}"></div>
+        <div>
+          <div style="font-weight:700">{{ band.name }}</div>
+          <div class="text-muted" style="font-size:12px">
+            {{ band.members | length }} {{ t('common.member') if band.members | length == 1 else t('common.members') }}
+          </div>
+        </div>
+      </div>
+      <p>{{ band.description or t('band.no_description') }}</p>
+      <div style="margin-top:16px">
+        <span class="badge" style="background:{{ band.color }}22; color:{{ band.color }}">
+          {{ band.territory.area_km2 | round(2) if band.territory else 0 }} km2
+        </span>
+        {% if band.join_policy == "open" %}
+        <span class="badge badge-success">{{ t('band.open_badge') }}</span>
+        {% elif band.join_policy == "request" %}
+        <span class="badge badge-yellow">{{ t('band.request_badge') }}</span>
+        {% else %}
+        <span class="badge badge-muted">{{ t('band.invite_badge') }}</span>
+        {% endif %}
+      </div>
+    </a>
+    {% else %}
+    <p class="text-muted">{{ t('band.none_yet') }}</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  function setBandScope(scope) {
+    document.getElementById("scopeInput").value = scope;
+    const form = document.getElementById("bandFilterForm");
+    if (scope === "local" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          document.getElementById("latInput").value = position.coords.latitude;
+          document.getElementById("lonInput").value = position.coords.longitude;
+          form.submit();
+        },
+        () => form.submit()
+      );
+    } else {
+      form.submit();
+    }
+  }
+</script>
+{% endblock %}

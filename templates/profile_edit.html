@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.profile_edit') }} - Graffiti Wars{% endblock %}
+{% block content %}
+<div class="container section" style="max-width:560px">
+  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('profile.edit_title') }}</h1>
+  <form method="POST" enctype="multipart/form-data" class="card">
+    <div class="field">
+      <label>{{ t('profile.field_username') }}</label>
+      <input type="text" name="username" value="{{ current_user.username }}" minlength="3" maxlength="24" required />
+    </div>
+
+    <div class="field">
+      <label>{{ t('profile.field_bio') }}</label>
+      <textarea name="bio" rows="3" maxlength="300">{{ current_user.bio or "" }}</textarea>
+    </div>
+
+    <div class="field">
+      <label>{{ t('profile.field_avatar') }}</label>
+      <div class="flex items-center gap-12 mb-8">
+        <img class="avatar" src="{{ current_user.display_avatar_url }}" width="56" height="56" />
+        <input type="file" name="avatar" accept="image/*" />
+      </div>
+      <p style="font-size:12px">{{ t('profile.field_avatar_help') }}</p>
+    </div>
+
+    <div class="field">
+      <label>{{ t('profile.field_banner') }}</label>
+      <input type="file" name="banner" accept="image/*" />
+      <p style="font-size:12px; margin-top:6px">{{ t('profile.field_avatar_help') }}</p>
+    </div>
+
+    <div class="field">
+      <label>{{ t('profile.field_nationality') }}</label>
+      <select name="nationality_code">
+        <option value="">{{ t('profile.nationality_none') }}</option>
+        {% for country in countries %}
+        <option value="{{ country.code }}" {{ "selected" if current_user.nationality_code == country.code else "" }}>
+          {{ country.flag }} {{ country.hu if g.locale == "hu" else country.en }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field mb-24">
+      <label class="flex items-center gap-8" style="cursor:pointer">
+        <input type="checkbox" name="allow_direct_messages" {{ "checked" if current_user.allow_direct_messages else "" }} style="width:auto" />
+        <span style="font-weight:400; color:var(--text)">{{ t('profile.field_allow_dm') }}</span>
+      </label>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">{{ t('profile.save_button') }}</button>
+  </form>
+</div>
+{% endblock %}

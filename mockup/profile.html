@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>reflex profilja - Graffiti Wars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .profile-header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  .profile-avatar { width: 96px; height: 96px; border: 3px solid var(--pink); }
+  .badge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 14px;
+  }
+  .achievement {
+    text-align: center;
+    padding: 16px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .achievement .emoji { font-size: 26px; margin-bottom: 6px; }
+  .achievement.locked { opacity: 0.35; }
+  .achievement .name { font-size: 11px; color: var(--text-muted); }
+  .thumb-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .thumb {
+    width: 72px; height: 72px; border-radius: var(--radius-sm);
+    background: repeating-linear-gradient(45deg, #23232f, #23232f 8px, #1b1b24 8px, #1b1b24 16px);
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo"><span>GRAFFITI</span><span class="dot">WARS</span></div>
+  <div class="navbar-links">
+    <a href="map.html">Terkep</a>
+    <a href="band.html">Bandak</a>
+    <a href="index.html#stats">Statisztikak</a>
+    <a href="index.html#feed">Hirfal</a>
+    <a href="profile.html" class="active">Profil</a>
+  </div>
+  <div class="navbar-actions">
+    <img class="avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=user" width="34" height="34" alt="avatar" />
+  </div>
+</nav>
+
+<div class="container section">
+
+  <div class="profile-header">
+    <img class="avatar profile-avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=reflex" alt="avatar" />
+    <div style="flex:1">
+      <div class="flex items-center gap-8 mb-8">
+        <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800">reflex</h1>
+        <span class="badge badge-pink">Banda vezeto</span>
+      </div>
+      <p>Nitro Kings tagja &middot; csatlakozott 2025.03.12</p>
+    </div>
+    <a href="#" class="btn btn-secondary">Profil szerkesztese</a>
+  </div>
+
+  <div class="grid grid-4 mb-32">
+    <div class="stat-card">
+      <div class="stat-value stat-pink">11</div>
+      <div class="stat-label">Elfogadott tag pont</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value stat-cyan">92%</div>
+      <div class="stat-label">Elfogadasi arany</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value stat-yellow">38%</div>
+      <div class="stat-label">Hozzajarulas a bandahoz</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value stat-purple">#2</div>
+      <div class="stat-label">Rangsor a bandaban</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div>
+      <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">Jelvenyek</h2>
+      <div class="badge-grid">
+        <div class="achievement"><div class="emoji">🏆</div><div class="name">Alapito</div></div>
+        <div class="achievement"><div class="emoji">🎯</div><div class="name">10+ pont</div></div>
+        <div class="achievement"><div class="emoji">🔥</div><div class="name">7 napos sorozat</div></div>
+        <div class="achievement locked"><div class="emoji">🌍</div><div class="name">1 km2 egyeni</div></div>
+        <div class="achievement locked"><div class="emoji">👑</div><div class="name">Toplista #1</div></div>
+        <div class="achievement locked"><div class="emoji">🛡️</div><div class="name">Veteran (1 ev)</div></div>
+      </div>
+
+      <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16 mt-32" style="margin-top:32px">Legutobbi aktivitas</h2>
+      <div class="card">
+        <div style="display:flex; gap:14px; padding:12px 0; border-bottom:1px solid var(--border)">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--success);margin-top:6px"></div>
+          <div><div>Uj pont hitelesitve - Rakoczi ut</div><div class="text-muted" style="font-size:12px">2 oraja</div></div>
+        </div>
+        <div style="display:flex; gap:14px; padding:12px 0; border-bottom:1px solid var(--border)">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--yellow);margin-top:6px"></div>
+          <div><div>Beadvany civil megerositesre var - Blaha</div><div class="text-muted" style="font-size:12px">1 napja</div></div>
+        </div>
+        <div style="display:flex; gap:14px; padding:12px 0">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--success);margin-top:6px"></div>
+          <div><div>Uj pont hitelesitve - Nepszinhaz utca</div><div class="text-muted" style="font-size:12px">4 napja</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">Beadott tagek</h2>
+      <div class="thumb-row">
+        <div class="thumb"></div>
+        <div class="thumb"></div>
+        <div class="thumb"></div>
+        <div class="thumb"></div>
+        <div class="thumb"></div>
+        <div class="thumb"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="container">
+    <div class="logo" style="font-size:16px"><span>GRAFFITI</span><span class="dot">WARS</span></div>
+    <p>&copy; 2026 Graffiti Wars. A feltoltott tartalomert a feltolto felel.</p>
+  </div>
+</footer>
+
+</body>
+</html>

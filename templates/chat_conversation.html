@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - Graffiti Wars{% endblock %}
+{% block extra_head %}
+<style>
+  .chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 61px - 144px); max-height: 640px; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .chat-bubble { max-width: 70%; padding: 10px 14px; border-radius: 14px; background: var(--bg-elevated); align-self: flex-start; }
+  .chat-bubble.own { background: linear-gradient(135deg, var(--pink), var(--purple)); color: #fff; align-self: flex-end; }
+  .chat-bubble .meta { font-size: 11px; opacity: 0.7; margin-bottom: 2px; }
+  .chat-form { display: flex; gap: 10px; padding: 16px; border-top: 1px solid var(--border); }
+  .chat-form input[type="text"] { flex: 1; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container section" style="max-width:640px">
+  <a href="{{ url_for('chat.inbox') }}" class="text-muted" style="font-size:13px">&larr; {{ t('chat.back_to_inbox') }}</a>
+  <h1 style="font-size:24px; font-family:var(--font-body); font-weight:800" class="mb-16 mt-8">{{ title }}</h1>
+
+  <div class="card chat-wrap" style="padding:0">
+    <div class="chat-messages" id="chatMessages">
+      {% for message in messages %}
+      <div class="chat-bubble {{ 'own' if message.sender_id == current_user.id else '' }}" data-message-id="{{ message.id }}">
+        <div class="meta">{{ message.sender.username }} - {{ message.created_at.strftime("%Y.%m.%d %H:%M") }}</div>
+        <div>{{ message.body }}</div>
+      </div>
+      {% else %}
+      <p class="text-muted">{{ t('chat.no_messages_yet') }}</p>
+      {% endfor %}
+    </div>
+    <form class="chat-form" id="chatForm">
+      <input type="text" name="body" id="chatInput" placeholder="{{ t('chat.message_placeholder') }}" maxlength="2000" autocomplete="off" required />
+      <button type="submit" class="btn btn-primary">{{ t('chat.send_button') }}</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  initChatPolling(
+    {{ conversation.id }},
+    {{ url_for('chat.send_message', conversation_id=conversation.id) | tojson }},
+    {{ url_for('chat.api_messages', conversation_id=conversation.id) | tojson }}
+  );
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.admin_bands') }} - Graffiti Wars{% endblock %}
+{% block content %}
+<div class="container section">
+  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-32">{{ t('admin.bands_title') }}</h1>
+
+  <div class="flex gap-16 mb-16">
+    <a href="{{ url_for('admin.queue') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_queue') }}</a>
+    <a href="{{ url_for('admin.users') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_users') }}</a>
+    <a href="{{ url_for('admin.bands') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_bands') }}</a>
+  </div>
+
+  <div class="card" style="padding:0">
+    <table>
+      <thead><tr><th>{{ t('admin.table_name') }}</th><th>{{ t('admin.table_leader') }}</th><th>{{ t('admin.table_members') }}</th><th>{{ t('admin.table_territory') }}</th><th>{{ t('admin.table_action') }}</th></tr></thead>
+      <tbody>
+        {% for band in bands %}
+        <tr>
+          <td>{{ band.name }}</td>
+          <td>{{ band.members | selectattr("band_role", "equalto", "leader") | map(attribute="username") | join(", ") }}</td>
+          <td>{{ band.members | length }}</td>
+          <td>{{ band.territory.area_km2 | round(2) if band.territory else 0 }} km2</td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.delete_band', band_id=band.id) }}" onsubmit="return confirm('{{ t('admin.confirm_delete_band') }}');">
+              <button class="btn btn-danger btn-sm">{{ t('admin.delete') }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

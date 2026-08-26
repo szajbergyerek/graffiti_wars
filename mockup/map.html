@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Terkep - Graffiti Wars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  .app-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    height: calc(100vh - 61px);
+  }
+  .sidebar {
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .sidebar h4 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-faint);
+    margin-bottom: 12px;
+    font-family: var(--font-body);
+  }
+  .layer-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+  }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; }
+  .mini-band-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .mini-band-row:last-child { border-bottom: none; }
+  .map-wrap { position: relative; }
+  #mainMap { width: 100%; height: 100%; }
+  .fab {
+    position: absolute;
+    bottom: 28px;
+    right: 28px;
+    z-index: 50;
+    box-shadow: var(--shadow);
+    font-size: 15px;
+    padding: 15px 24px;
+  }
+  .map-legend {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 50;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    font-size: 12px;
+  }
+  .map-legend .row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .modal textarea, .modal .dropzone { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo"><span>GRAFFITI</span><span class="dot">WARS</span></div>
+  <div class="navbar-links">
+    <a href="map.html" class="active">Terkep</a>
+    <a href="band.html">Bandak</a>
+    <a href="index.html#stats">Statisztikak</a>
+    <a href="index.html#feed">Hirfal</a>
+    <a href="profile.html">Profil</a>
+  </div>
+  <div class="navbar-actions">
+    <img class="avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=user" width="34" height="34" alt="avatar" />
+  </div>
+</nav>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="field">
+      <input type="search" placeholder="Banda vagy hely keresese..." />
+    </div>
+
+    <h4>Retegek</h4>
+    <div class="layer-row"><input type="checkbox" checked /> <span>Banda teruletek</span></div>
+    <div class="layer-row"><input type="checkbox" checked /> <span>Hitelesitett tag pontok</span></div>
+    <div class="layer-row"><input type="checkbox" /> <span>Fuggoben levo beadvanyok</span></div>
+    <div class="layer-row"><input type="checkbox" /> <span>Legalis falak</span></div>
+
+    <div class="mb-24"></div>
+    <h4>Toplista ezen a teruleten</h4>
+    <div class="mini-band-row">
+      <div class="swatch" style="background:var(--yellow)"></div>
+      <div style="flex:1">Yellow Vandals</div>
+      <div class="text-muted">3.9 km2</div>
+    </div>
+    <div class="mini-band-row">
+      <div class="swatch" style="background:var(--cyan)"></div>
+      <div style="flex:1">Cyan Ghosts</div>
+      <div class="text-muted">3.4 km2</div>
+    </div>
+    <div class="mini-band-row">
+      <div class="swatch" style="background:var(--pink)"></div>
+      <div style="flex:1">Nitro Kings</div>
+      <div class="text-muted">2.8 km2</div>
+    </div>
+    <div class="mini-band-row">
+      <div class="swatch" style="background:var(--purple)"></div>
+      <div style="flex:1">Purple Reign</div>
+      <div class="text-muted">1.9 km2</div>
+    </div>
+
+    <div class="mb-24"></div>
+    <h4>Sajat bandad</h4>
+    <div class="card" style="padding:16px">
+      <div class="flex items-center gap-12 mb-16">
+        <div class="tag-swatch avatar" style="width:38px;height:38px;background:var(--pink)"></div>
+        <div>
+          <div style="font-weight:700">Nitro Kings</div>
+          <div class="text-muted" style="font-size:12px">6 tag</div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block btn-sm" onclick="toggleModal('submitModal')">+ Tag felvitele</button>
+    </div>
+  </aside>
+
+  <div class="map-wrap">
+    <div id="mainMap" data-init-map data-interactive="true" data-zoom="14"></div>
+
+    <div class="map-legend">
+      <div class="row"><div class="swatch" style="background:var(--pink)"></div> Nitro Kings</div>
+      <div class="row"><div class="swatch" style="background:var(--cyan)"></div> Cyan Ghosts</div>
+      <div class="row"><div class="swatch" style="background:var(--yellow)"></div> Yellow Vandals</div>
+      <div class="row"><div class="swatch" style="background:var(--purple)"></div> Purple Reign</div>
+    </div>
+
+    <button class="btn btn-primary fab" onclick="toggleModal('submitModal')">+ Tag felvitele</button>
+  </div>
+</div>
+
+<!-- Tag submission modal -->
+<div class="modal-backdrop" id="submitModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 style="font-family:var(--font-body); font-weight:800; font-size:18px">Uj tag beadasa</h3>
+      <button class="modal-close" onclick="toggleModal('submitModal')">&times;</button>
+    </div>
+
+    <div class="field">
+      <label>Banda</label>
+      <select disabled>
+        <option>Nitro Kings (sajat bandad)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Fenykep a friss tagrol</label>
+      <div class="dropzone">
+        Kattints vagy huzd ide a fotot<br />
+        <span class="text-muted" style="font-size:12px">JPG/PNG, max 15 MB</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Lokacio</label>
+      <input type="text" value="47.4995, 19.0401 (automatikus GPS)" readonly />
+    </div>
+
+    <div class="field mb-24">
+      <label>Megjegyzes (opcionalis)</label>
+      <textarea rows="2" placeholder="Pl. pontos cim, kereszteutca..."></textarea>
+    </div>
+
+    <button class="btn btn-primary btn-block">Beküldes hitelesitesre</button>
+    <p class="text-center mt-8" style="margin-top:12px; font-size:12px">Az AI automatikusan osszeveti a banda regisztralt tagjevel.</p>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

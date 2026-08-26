@@ -1,0 +1,423 @@
+"""
+Central translation table for every user-facing string on the site.
+
+Each entry maps a dotted key to its text in every supported locale, so a
+translator can see and edit both versions of a string side by side, and it
+is structurally impossible for one locale to silently drop a key that the
+other one has.
+"""
+
+DEFAULT_LOCALE = "hu"
+SUPPORTED_LOCALES = ["hu", "en"]
+
+STRINGS: dict[str, dict[str, str]] = {
+    # ---------- Navigation ----------
+    "nav.map": {"hu": "Térkép", "en": "Map"},
+    "nav.bands": {"hu": "Bandák", "en": "Gangs"},
+    "nav.feed": {"hu": "Hírfal", "en": "Feed"},
+    "nav.profile": {"hu": "Profil", "en": "Profile"},
+    "nav.admin": {"hu": "Admin", "en": "Admin"},
+    "nav.chat": {"hu": "Üzenetek", "en": "Chat"},
+    "nav.create_band": {"hu": "Banda létrehozása", "en": "Create a gang"},
+    "nav.logout": {"hu": "Kilépés", "en": "Log out"},
+    "nav.login": {"hu": "Belépés", "en": "Log in"},
+
+    # ---------- Footer ----------
+    "footer.rights": {
+        "hu": "© 2026 Graffiti Wars. A feltöltött tartalomért a feltöltő felel.",
+        "en": "© 2026 Graffiti Wars. Uploaders are responsible for their own content.",
+    },
+
+    # ---------- Common ----------
+    "common.member": {"hu": "tag", "en": "member"},
+    "common.members": {"hu": "tag", "en": "members"},
+
+    # ---------- Page titles ----------
+    "title.home": {"hu": "Graffiti Wars", "en": "Graffiti Wars"},
+    "title.map": {"hu": "Térkép", "en": "Map"},
+    "title.bands": {"hu": "Bandák", "en": "Gangs"},
+    "title.band_create": {"hu": "Új banda", "en": "New gang"},
+    "title.profile_edit": {"hu": "Profil szerkesztése", "en": "Edit profile"},
+    "title.tag_submit": {"hu": "Tag felvitele", "en": "Submit a tag"},
+    "title.feed": {"hu": "Hírfal", "en": "Feed"},
+    "title.leaderboard": {"hu": "Toplista", "en": "Leaderboard"},
+    "title.band_settings": {"hu": "Banda beállításai", "en": "Gang settings"},
+    "title.admin_queue": {"hu": "Moderáció", "en": "Moderation"},
+    "title.admin_users": {"hu": "Felhasználók", "en": "Users"},
+    "title.admin_bands": {"hu": "Bandák kezelése", "en": "Manage gangs"},
+
+    # ---------- Home page ----------
+    "home.hero_title": {
+        "hu": 'FESD FEL A VÁROST.<br/><span class="accent">FOGLALD EL</span> A <span class="accent2">TERÜLETET.</span>',
+        "en": 'TAG THE CITY.<br/><span class="accent">CLAIM</span> THE <span class="accent2">TERRITORY.</span>',
+    },
+    "home.lead": {
+        "hu": "Hozz létre bandát, jelöld meg a tageteket a térképen, és szerezz területet minden hitelesített falfestéssel. Valós helyszínek, AI-hitelesítés, élő verseny.",
+        "en": "Form a gang, mark your tags on the map, and claim territory with every verified piece. Real locations, AI verification, live competition.",
+    },
+    "home.cta_join": {"hu": "Csatlakozom", "en": "Join now"},
+    "home.cta_open_map": {"hu": "Térkép megnyitása", "en": "Open the map"},
+    "home.cta_view_map": {"hu": "Élő térkép megtekintése", "en": "View the live map"},
+    "home.stat_bands": {"hu": "Aktív banda", "en": "Active gangs"},
+    "home.stat_area": {"hu": "Lefedett terület", "en": "Territory covered"},
+    "home.stat_tags": {"hu": "Hitelesített tag", "en": "Verified tags"},
+    "home.stat_users": {"hu": "Regisztrált játékos", "en": "Registered players"},
+    "home.how_title": {"hu": "Hogyan működik?", "en": "How it works"},
+    "home.how_sub": {"hu": "Négy lépésben szerezhetsz területet a bandádnak.", "en": "Four steps to claim territory for your gang."},
+    "home.step1_title": {"hu": "Alakíts bandát", "en": "Form a gang"},
+    "home.step1_desc": {
+        "hu": "Nevezd el, tölts fel egy referencia tag-képet - ez lesz a banda hiteles alapja.",
+        "en": "Name it, upload a reference tag photo - this becomes the gang's verified baseline.",
+    },
+    "home.step2_title": {"hu": "Fesd fel a tagedet", "en": "Paint your tag"},
+    "home.step2_desc": {
+        "hu": "Menj ki a helyszínre, készíts fotót a friss munkáról és add meg a lokációt.",
+        "en": "Go to the spot, photograph the fresh piece, and set its location.",
+    },
+    "home.step3_title": {"hu": "AI hitelesítés", "en": "AI verification"},
+    "home.step3_desc": {
+        "hu": "A rendszer összeveti a fotót a banda regisztrált tagjével, és jóváhagyja a pontot.",
+        "en": "The system compares the photo to the gang's registered tag and approves the point.",
+    },
+    "home.step4_title": {"hu": "Terület a tiéd", "en": "The territory is yours"},
+    "home.step4_desc": {
+        "hu": "A hitelesített pontok körül kiterjed a banda területe a térképen.",
+        "en": "Your gang's territory expands on the map around every verified point.",
+    },
+    "home.map_title": {"hu": "Élő térkép", "en": "Live map"},
+    "home.map_sub": {
+        "hu": "Nézd meg élőben, mely bandák uralják jelenleg a várost.",
+        "en": "See live which gangs currently rule the city.",
+    },
+    "home.map_open_full": {"hu": "Teljes térkép megnyitása", "en": "Open the full map"},
+    "home.leaderboard_title": {"hu": "Toplista", "en": "Leaderboard"},
+    "home.leaderboard_sub": {"hu": "A legnagyobb területet uraló bandák.", "en": "The gangs controlling the most territory."},
+    "home.no_territory_yet": {
+        "hu": "Még senki nem foglalt területet - legyél te az első!",
+        "en": "No one has claimed territory yet - be the first!",
+    },
+    "home.feed_title": {"hu": "Hírfal", "en": "Feed"},
+    "home.feed_sub": {"hu": "Amit a bandák most csinálnak.", "en": "What the gangs are up to right now."},
+    "home.feed_empty": {
+        "hu": "Még nem történt semmi - kezdődjön a háború!",
+        "en": "Nothing has happened yet - let the war begin!",
+    },
+
+    # ---------- Map page ----------
+    "map.leaderboard_title": {"hu": "Toplista", "en": "Leaderboard"},
+    "map.no_territory": {"hu": "Még nincs terület lefoglalva.", "en": "No territory has been claimed yet."},
+    "map.your_gang_title": {"hu": "Saját bandád", "en": "Your gang"},
+    "map.submit_tag_button": {"hu": "+ Tag felvitele", "en": "+ Add a tag"},
+    "map.no_gang_prompt": {
+        "hu": "Csatlakozz egy bandához, hogy te is területet foglalhass.",
+        "en": "Join a gang so you can claim territory too.",
+    },
+    "map.browse_gangs": {"hu": "Bandák listája", "en": "Browse gangs"},
+    "map.login_prompt": {"hu": "Jelentkezz be a részvételhez.", "en": "Log in to take part."},
+
+    # ---------- Bands ----------
+    "band.list_title": {"hu": "Bandák", "en": "Gangs"},
+    "band.new_button": {"hu": "+ Új banda", "en": "+ New gang"},
+    "band.no_description": {"hu": "Nincs leírás.", "en": "No description."},
+    "band.open_badge": {"hu": "Csatlakozható", "en": "Open"},
+    "band.request_badge": {"hu": "Kérvényezhető", "en": "Request to join"},
+    "band.invite_badge": {"hu": "Meghívásos", "en": "Invite only"},
+    "band.none_yet": {"hu": "Még nincs egy banda sem - legyél te az első!", "en": "No gangs yet - be the first!"},
+    "band.create_title": {"hu": "Hozz létre bandát", "en": "Create a gang"},
+    "band.field_name": {"hu": "Banda neve", "en": "Gang name"},
+    "band.field_description": {"hu": "Leírás (opcionális)", "en": "Description (optional)"},
+    "band.field_reference_image": {"hu": "Referencia tag kép", "en": "Reference tag photo"},
+    "band.reference_help": {
+        "hu": "Ez lesz az alap, amihez minden később beadott fotót hasonlít az AI.",
+        "en": "This becomes the baseline every future submitted photo is compared against by the AI.",
+    },
+    "band.field_join_policy": {"hu": "Csatlakozás módja", "en": "How members can join"},
+    "band.join_policy_open": {"hu": "Nyílt - bárki azonnal csatlakozhat", "en": "Open - anyone can join instantly"},
+    "band.join_policy_request": {
+        "hu": "Kérvényezhető - a vezetőnek jóvá kell hagynia",
+        "en": "Request to join - a leader must approve",
+    },
+    "band.join_policy_invite": {
+        "hu": "Meghívásos - csak a vezető adhat hozzá tagot",
+        "en": "Invite only - a leader must add members directly",
+    },
+    "band.create_submit": {"hu": "Banda létrehozása", "en": "Create gang"},
+    "band.founded_on": {"hu": "Alapítva: {date}", "en": "Founded: {date}"},
+    "band.leave_button": {"hu": "Kilépés a bandából", "en": "Leave the gang"},
+    "band.join_button": {"hu": "Csatlakozás", "en": "Join"},
+    "band.request_join_button": {"hu": "Csatlakozás kérése", "en": "Request to join"},
+    "band.request_pending": {"hu": "A kérésed elbírálás alatt.", "en": "Your request is pending approval."},
+    "band.requests_title": {"hu": "Csatlakozási kérések", "en": "Join requests"},
+    "band.no_requests": {"hu": "Nincs függőben lévő kérés.", "en": "No pending requests."},
+    "band.approve_request": {"hu": "Elfogad", "en": "Approve"},
+    "band.reject_request": {"hu": "Elutasít", "en": "Reject"},
+    "band.add_member_title": {"hu": "Tag hozzáadása", "en": "Add a member"},
+    "band.add_member_placeholder": {"hu": "Felhasználónév", "en": "Username"},
+    "band.add_member_button": {"hu": "Hozzáadás", "en": "Add"},
+    "band.stat_area": {"hu": "Lefedett terület", "en": "Territory covered"},
+    "band.stat_members": {"hu": "Aktív tag", "en": "Active members"},
+    "band.stat_verified_points": {"hu": "Hitelesített tag pont", "en": "Verified tag points"},
+    "band.stat_joining_label": {"hu": "Csatlakozás", "en": "Joining"},
+    "band.map_title": {"hu": "Terület a térképen", "en": "Territory on the map"},
+    "band.members_title": {"hu": "Tagok és hozzájárulás", "en": "Members and contribution"},
+    "band.table_user": {"hu": "Felhasználó", "en": "User"},
+    "band.table_joined": {"hu": "Csatlakozott", "en": "Joined"},
+    "band.table_verified": {"hu": "Hitelesített pontok", "en": "Verified points"},
+    "band.table_role": {"hu": "Szerep", "en": "Role"},
+    "band.role_leader": {"hu": "Vezető", "en": "Leader"},
+    "band.role_member": {"hu": "Tag", "en": "Member"},
+
+    # ---------- Profile ----------
+    "profile.civilian": {"hu": "Civil néző", "en": "Civilian spectator"},
+    "profile.member_of": {"hu": "{band} tagja - csatlakozott {date}", "en": "Member of {band} - joined {date}"},
+    "profile.admin_badge": {"hu": "Admin", "en": "Admin"},
+    "profile.leader_badge": {"hu": "Banda vezető", "en": "Gang leader"},
+    "profile.stat_approved": {"hu": "Elfogadott tag pont", "en": "Approved tag points"},
+    "profile.stat_acceptance_rate": {"hu": "Elfogadási arány", "en": "Acceptance rate"},
+    "profile.stat_contribution": {"hu": "Hozzájárulás a bandához", "en": "Contribution to gang"},
+    "profile.stat_submitted": {"hu": "Összes beadvány", "en": "Total submissions"},
+    "profile.recent_title": {"hu": "Legutóbbi beadványok", "en": "Recent submissions"},
+    "profile.no_tags_yet": {"hu": "Még nincs beadott tag.", "en": "No tags submitted yet."},
+    "profile.edit_button": {"hu": "Profil szerkesztése", "en": "Edit profile"},
+    "profile.message_button": {"hu": "Üzenet küldése", "en": "Send message"},
+    "profile.edit_title": {"hu": "Profil szerkesztése", "en": "Edit profile"},
+    "profile.field_username": {"hu": "Felhasználónév", "en": "Username"},
+    "profile.field_bio": {"hu": "Bemutatkozás", "en": "Bio"},
+    "profile.field_avatar": {"hu": "Profilkép", "en": "Profile picture"},
+    "profile.field_avatar_help": {"hu": "Hagyd üresen, ha nem változtatod.", "en": "Leave empty to keep the current one."},
+    "profile.field_banner": {"hu": "Banner kép", "en": "Banner image"},
+    "profile.field_nationality": {"hu": "Nemzetiség", "en": "Nationality"},
+    "profile.nationality_none": {"hu": "Nincs megadva", "en": "Not set"},
+    "profile.save_button": {"hu": "Mentés", "en": "Save"},
+
+    # ---------- Tag status ----------
+    "status.approved": {"hu": "jóváhagyva", "en": "approved"},
+    "status.rejected": {"hu": "elutasítva", "en": "rejected"},
+    "status.pending": {"hu": "függőben", "en": "pending"},
+    "status.removed": {"hu": "eltávolítva", "en": "removed"},
+
+    # ---------- Auth flash messages ----------
+    "flash.account_banned": {"hu": "Ez a fiók ki van tiltva.", "en": "This account has been banned."},
+    "flash.username_taken": {"hu": "Ez a felhasználónév már foglalt.", "en": "This username is already taken."},
+    "flash.profile_updated": {"hu": "Profil frissítve.", "en": "Profile updated."},
+    "auth.error.username_too_short": {
+        "hu": "A felhasználónév legalább 3 karakter legyen.",
+        "en": "The username must be at least 3 characters long.",
+    },
+    "auth.error.username_too_long": {
+        "hu": "A felhasználónév legfeljebb 24 karakter lehet.",
+        "en": "The username can be at most 24 characters long.",
+    },
+    "auth.error.username_invalid_characters": {
+        "hu": "A felhasználónév nem tartalmazhat láthatatlan karaktereket, szóközt vagy '/' jelet.",
+        "en": "The username can't contain invisible characters, spaces, or a '/'.",
+    },
+
+    # ---------- Band flash messages ----------
+    "flash.must_leave_band_first": {
+        "hu": "Már tagja vagy egy bandának - előbb lépj ki belőle.",
+        "en": "You're already in a gang - leave it first.",
+    },
+    "flash.band_missing_fields": {
+        "hu": "Név és referencia kép megadása kötelező.",
+        "en": "A name and a reference image are required.",
+    },
+    "flash.band_name_taken": {"hu": "Ilyen nevű banda már létezik.", "en": "A gang with this name already exists."},
+    "flash.unsupported_image": {"hu": "Nem támogatott képformátum.", "en": "Unsupported image format."},
+    "flash.band_created": {"hu": "A banda létrejött!", "en": "The gang has been created!"},
+    "flash.already_member": {"hu": "Már tagja vagy egy bandának.", "en": "You're already a member of a gang."},
+    "flash.band_closed": {"hu": "Ehhez a bandához nem lehet önállóan csatlakozni.", "en": "You can't join this gang on your own."},
+    "flash.joined_band": {"hu": "Csatlakoztál a(z) {band} bandához!", "en": "You joined {band}!"},
+    "flash.left_band": {"hu": "Elhagytad a bandát.", "en": "You left the gang."},
+    "flash.join_request_sent": {"hu": "Elküldtük a csatlakozási kérésedet.", "en": "Your join request has been sent."},
+    "flash.join_request_already_sent": {
+        "hu": "Már küldtél kérést ehhez a bandához.",
+        "en": "You already sent a request to this gang.",
+    },
+    "flash.join_request_approved": {"hu": "Kérés elfogadva.", "en": "Request approved."},
+    "flash.join_request_rejected": {"hu": "Kérés elutasítva.", "en": "Request rejected."},
+    "flash.member_added": {"hu": "{username} hozzáadva a bandához.", "en": "{username} added to the gang."},
+    "flash.user_not_found": {"hu": "Nincs ilyen felhasználó.", "en": "No such user."},
+    "flash.user_not_civilian": {
+        "hu": "Ez a felhasználó már tagja egy bandának.",
+        "en": "This user is already in a gang.",
+    },
+
+    # ---------- Tag flash messages ----------
+    "flash.members_only": {
+        "hu": "Csak banda tagok tudnak tag pontot felvinni.",
+        "en": "Only gang members can add tag points.",
+    },
+    "flash.tag_missing_fields": {
+        "hu": "Fénykép megadása kötelező.",
+        "en": "A photo is required.",
+    },
+    "flash.tag_approved": {
+        "hu": "A tag hitelesítve és jóváhagyva! A terület frissült.",
+        "en": "The tag was verified and approved! The territory has been updated.",
+    },
+    "flash.photo_no_capture_time": {
+        "hu": "A fotó nem tartalmaz készítési időpontot, nem tudjuk ellenőrizni a frissességét.",
+        "en": "The photo has no capture timestamp, so we can't verify how fresh it is.",
+    },
+    "flash.photo_too_old": {
+        "hu": "A fotónak frissen, most kell készülnie - ez a kép régebbi 1 percnél.",
+        "en": "The photo must be freshly taken, right now - this one is older than 1 minute.",
+    },
+    "flash.submission_cancelled": {"hu": "A feltöltés megszakítva.", "en": "The submission was cancelled."},
+    "flash.report_thanks": {
+        "hu": "Köszönjük a jelzést, az admin csapat megvizsgálja.",
+        "en": "Thanks for the report, the admin team will look into it.",
+    },
+
+    # ---------- Admin flash messages ----------
+    "flash.report_closed": {"hu": "Jelentés lezárva.", "en": "Report closed."},
+    "flash.user_status_updated": {"hu": "Felhasználó státusza frissítve.", "en": "User status updated."},
+    "flash.band_deleted": {"hu": "Banda törölve.", "en": "Gang deleted."},
+
+    # ---------- News feed ----------
+    "feed.band_created": {"hu": "Új banda alakult: {band}", "en": "A new gang has formed: {band}"},
+    "feed.member_joined": {"hu": "{username} csatlakozott: {band}", "en": "{username} joined {band}"},
+    "feed.tag_approved": {"hu": "{band} új tagot hitelesített ({username})", "en": "{band} verified a new tag ({username})"},
+
+    # ---------- Tag submission page ----------
+    "tag.submit_title": {"hu": "Új tag beadása - {band}", "en": "New tag submission - {band}"},
+    "tag.field_photo": {"hu": "Fénykép a friss tagról", "en": "Photo of the fresh tag"},
+    "tag.field_location": {
+        "hu": "Lokáció (kattints a térképre, vagy engedélyezd a helymeghatározást)",
+        "en": "Location (click the map, or allow location access)",
+    },
+    "tag.submit_button": {"hu": "Tovább", "en": "Continue"},
+    "tag.upload_help": {
+        "hu": "A fotónak most, a helyszínen készültnek kell lennie - ne tölts fel régebbi képet.",
+        "en": "The photo must be taken right now, on the spot - don't upload an older picture.",
+    },
+    "tag.locate_title": {"hu": "Erősítsd meg a helyet", "en": "Confirm the location"},
+    "tag.locate_help": {
+        "hu": "A fotódnak nem volt GPS-adata. Engedélyezd a helymeghatározást, vagy állítsd be kézzel a térképen.",
+        "en": "Your photo had no GPS data. Allow location access, or set it manually on the map.",
+    },
+    "tag.accept_button": {"hu": "Elfogadás", "en": "Accept"},
+    "tag.cancel_button": {"hu": "Mégse", "en": "Cancel"},
+    "tag.processing_title": {"hu": "Hitelesítés folyamatban...", "en": "Verifying..."},
+    "tag.processing_message": {
+        "hu": "Az AI most ellenőrzi a taget. Ez csak néhány másodpercig tart.",
+        "en": "The AI is checking your tag. This only takes a few seconds.",
+    },
+    "tag.ai_note": {
+        "hu": "Az AI automatikusan összeveti a banda regisztrált tagjével.",
+        "en": "The AI automatically compares it with the gang's registered tag.",
+    },
+
+    # ---------- Admin panel ----------
+    "admin.nav_queue": {"hu": "Várólista", "en": "Queue"},
+    "admin.nav_users": {"hu": "Felhasználók", "en": "Users"},
+    "admin.nav_bands": {"hu": "Bandák", "en": "Gangs"},
+    "admin.queue_title": {"hu": "Moderációs várólista", "en": "Moderation queue"},
+    "admin.table_band": {"hu": "Banda", "en": "Gang"},
+    "admin.table_action": {"hu": "Művelet", "en": "Action"},
+    "admin.reports_title": {"hu": "Nyitott jelentések (eltűnt tag)", "en": "Open reports (missing tag)"},
+    "admin.table_tag": {"hu": "Tag", "en": "Tag"},
+    "admin.table_reporter": {"hu": "Jelentő", "en": "Reporter"},
+    "admin.table_reason": {"hu": "Indoklás", "en": "Reason"},
+    "admin.remove_tag": {"hu": "Tag eltávolítása", "en": "Remove tag"},
+    "admin.dismiss": {"hu": "Elvetés", "en": "Dismiss"},
+    "admin.no_reports": {"hu": "Nincs nyitott jelentés.", "en": "No open reports."},
+    "admin.users_title": {"hu": "Felhasználók", "en": "Users"},
+    "admin.table_name": {"hu": "Név", "en": "Name"},
+    "admin.table_email": {"hu": "Email", "en": "Email"},
+    "admin.table_registered": {"hu": "Regisztrált", "en": "Registered"},
+    "admin.table_status": {"hu": "Státusz", "en": "Status"},
+    "admin.ban": {"hu": "Tiltás", "en": "Ban"},
+    "admin.unban": {"hu": "Feloldás", "en": "Unban"},
+    "admin.banned_badge": {"hu": "Tiltva", "en": "Banned"},
+    "admin.bands_title": {"hu": "Bandák kezelése", "en": "Manage gangs"},
+    "admin.table_leader": {"hu": "Vezető", "en": "Leader"},
+    "admin.table_members": {"hu": "Tagok", "en": "Members"},
+    "admin.table_territory": {"hu": "Terület", "en": "Territory"},
+    "admin.delete": {"hu": "Törlés", "en": "Delete"},
+    "admin.confirm_delete_band": {"hu": "Biztosan törlöd?", "en": "Are you sure you want to delete this?"},
+    "admin.civilian_label": {"hu": "civil", "en": "civilian"},
+
+    # ---------- Chat ----------
+    "title.chat": {"hu": "Üzenetek", "en": "Chat"},
+    "chat.inbox_title": {"hu": "Üzenetek", "en": "Messages"},
+    "chat.empty_inbox": {
+        "hu": "Még nincs beszélgetésed. Írj valakinek a profiljáról!",
+        "en": "No conversations yet. Message someone from their profile!",
+    },
+    "chat.band_chat_label": {"hu": "banda csoport", "en": "gang group"},
+    "chat.message_placeholder": {"hu": "Írj üzenetet...", "en": "Write a message..."},
+    "chat.send_button": {"hu": "Küldés", "en": "Send"},
+    "chat.no_messages_yet": {"hu": "Még nincs üzenet - kezdd el a beszélgetést!", "en": "No messages yet - start the conversation!"},
+    "chat.back_to_inbox": {"hu": "Vissza az üzenetekhez", "en": "Back to messages"},
+
+    # ---------- Leaderboard page ----------
+    "leaderboard.tab_global": {"hu": "Globális", "en": "Global"},
+    "leaderboard.tab_national": {"hu": "Országos", "en": "National"},
+    "leaderboard.tab_local": {"hu": "Helyi", "en": "Local"},
+    "leaderboard.no_nationality": {
+        "hu": "Állíts be nemzetiséget a profilodon az országos toplista megtekintéséhez.",
+        "en": "Set a nationality on your profile to see the national leaderboard.",
+    },
+    "leaderboard.requesting_location": {"hu": "Helymeghatározás folyamatban...", "en": "Requesting your location..."},
+    "leaderboard.location_denied": {
+        "hu": "A helymeghatározás nem engedélyezett vagy nem sikerült.",
+        "en": "Location access was denied or failed.",
+    },
+    "leaderboard.empty": {"hu": "Nincs találat ebben a kategóriában.", "en": "No results in this category."},
+
+    # ---------- Band settings page ----------
+    "band.settings_button": {"hu": "Beállítások", "en": "Settings"},
+    "band.settings_title": {"hu": "Banda beállításai", "en": "Gang settings"},
+    "band.field_banner": {"hu": "Banner kép", "en": "Banner image"},
+    "band.field_reference_image_change": {"hu": "Referencia tag kép cseréje", "en": "Change reference tag photo"},
+    "band.field_image_help": {"hu": "Hagyd üresen, ha nem változtatod.", "en": "Leave empty to keep the current one."},
+    "band.field_nationality": {"hu": "Nemzetiség", "en": "Nationality"},
+    "band.nationality_none": {"hu": "Nincs megadva", "en": "Not set"},
+    "band.members_management_title": {"hu": "Tagok kezelése", "en": "Manage members"},
+    "band.kick_button": {"hu": "Kirúgás", "en": "Kick"},
+    "band.confirm_kick": {"hu": "Biztosan kirúgod?", "en": "Are you sure you want to kick this member?"},
+    "flash.band_settings_updated": {"hu": "Banda beállításai frissítve.", "en": "Gang settings updated."},
+    "flash.member_kicked": {"hu": "{username} kirúgva a bandából.", "en": "{username} kicked from the gang."},
+    "flash.cannot_kick_self": {
+        "hu": "Magadat nem tudod kirúgni - inkább lépj ki.",
+        "en": "You can't kick yourself - leave instead.",
+    },
+
+    # ---------- Bands list search/sort/filter ----------
+    "band.search_placeholder": {"hu": "Keresés név alapján...", "en": "Search by name..."},
+    "band.search_button": {"hu": "Keresés", "en": "Search"},
+    "band.sort_label": {"hu": "Rendezés", "en": "Sort by"},
+    "band.sort_newest": {"hu": "Legújabb", "en": "Newest"},
+    "band.sort_oldest": {"hu": "Legrégebbi", "en": "Oldest"},
+    "band.sort_area": {"hu": "Terület szerint", "en": "By territory"},
+    "band.sort_members": {"hu": "Taglétszám szerint", "en": "By member count"},
+    "band.filter_label": {"hu": "Csatlakozás szerint", "en": "By joinability"},
+    "band.filter_all": {"hu": "Mind", "en": "All"},
+    "band.scope_label": {"hu": "Kör", "en": "Scope"},
+
+    # ---------- DM privacy ----------
+    "profile.field_allow_dm": {"hu": "Bárki küldhet privát üzenetet", "en": "Anyone can send me private messages"},
+    "flash.cannot_message_user": {
+        "hu": "Ez a felhasználó nem fogad privát üzenetet.",
+        "en": "This user isn't accepting private messages.",
+    },
+
+    # ---------- Map sidebar ----------
+    "map.member_ranking_title": {"hu": "Tagok ranglistája", "en": "Member ranking"},
+
+    # ---------- Landmarks ----------
+    "band.landmarks_title": {"hu": "Területen található helyszínek", "en": "Landmarks in the territory"},
+    "band.landmarks_empty": {
+        "hu": "Nincs adat - a lista az első hitelesített tag után jelenik meg.",
+        "en": "No data yet - this appears after the first verified tag.",
+    },
+    "category.amenity": {"hu": "Vendéglátás és szolgáltatások", "en": "Amenities"},
+    "category.shop": {"hu": "Üzletek", "en": "Shops"},
+    "category.tourism": {"hu": "Turisztikai helyek", "en": "Tourism"},
+    "category.leisure": {"hu": "Szabadidő", "en": "Leisure"},
+    "category.historic": {"hu": "Történelmi helyszínek", "en": "Historic sites"},
+    "category.office": {"hu": "Irodák", "en": "Offices"},
+    "band.landmark_unnamed": {"hu": "Névtelen helyszín", "en": "Unnamed location"},
+}

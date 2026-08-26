@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin panel - Graffiti Wars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .admin-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: calc(100vh - 61px);
+  }
+  .admin-sidebar {
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+    padding: 20px 14px;
+  }
+  .admin-sidebar a {
+    display: block;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .admin-sidebar a.active, .admin-sidebar a:hover {
+    background: var(--bg-card);
+    color: var(--text);
+  }
+  .admin-main { padding: 32px; }
+  .thumb-sm {
+    width: 56px; height: 56px; border-radius: var(--radius-sm);
+    background: repeating-linear-gradient(45deg, #23232f, #23232f 6px, #1b1b24 6px, #1b1b24 12px);
+    border: 1px solid var(--border);
+  }
+  .confidence-bar { width: 90px; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo"><span>GRAFFITI</span><span class="dot">WARS</span> <span class="badge badge-purple">ADMIN</span></div>
+  <div></div>
+  <div class="navbar-actions">
+    <img class="avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=admin" width="34" height="34" alt="avatar" />
+  </div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <a href="#" class="active">Moderacios varolista</a>
+    <a href="#">Felhasznalok</a>
+    <a href="#">Bandak</a>
+    <a href="#">Audit naplo</a>
+    <a href="#">Beallitasok</a>
+  </aside>
+
+  <main class="admin-main">
+    <div class="grid grid-4 mb-32">
+      <div class="stat-card">
+        <div class="stat-value stat-yellow">14</div>
+        <div class="stat-label">Fuggoben levo beadvany</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-success" style="color:var(--success)">312</div>
+        <div class="stat-label">Ma jovahagyva</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-danger" style="color:var(--danger)">6</div>
+        <div class="stat-label">Vitatott pont</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-purple">1 530</div>
+        <div class="stat-label">Regisztralt felhasznalo</div>
+      </div>
+    </div>
+
+    <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">Moderacios varolista</h2>
+    <div class="card" style="padding:0">
+      <table>
+        <thead>
+          <tr>
+            <th>Fotó</th><th>Banda</th><th>Beküldő</th><th>Lokáció</th><th>AI megbízhatóság</th><th>Státusz</th><th>Művelet</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="thumb-sm"></div></td>
+            <td>Nitro Kings</td>
+            <td>writerX</td>
+            <td>47.500, 19.041</td>
+            <td><div class="progress-track confidence-bar"><div class="progress-fill" style="width:64%; background:var(--yellow)"></div></div></td>
+            <td><span class="badge badge-yellow">Civil megerositesre var</span></td>
+            <td class="flex gap-8">
+              <button class="btn btn-success btn-sm">Jovahagy</button>
+              <button class="btn btn-danger btn-sm">Elutasit</button>
+            </td>
+          </tr>
+          <tr>
+            <td><div class="thumb-sm"></div></td>
+            <td>Cyan Ghosts</td>
+            <td>ghost_writer</td>
+            <td>47.495, 19.052</td>
+            <td><div class="progress-track confidence-bar"><div class="progress-fill" style="width:31%; background:var(--danger)"></div></div></td>
+            <td><span class="badge badge-danger">Vitatott</span></td>
+            <td class="flex gap-8">
+              <button class="btn btn-success btn-sm">Jovahagy</button>
+              <button class="btn btn-danger btn-sm">Elutasit</button>
+            </td>
+          </tr>
+          <tr>
+            <td><div class="thumb-sm"></div></td>
+            <td>Purple Reign</td>
+            <td>violetKid</td>
+            <td>47.494, 19.036</td>
+            <td><div class="progress-track confidence-bar"><div class="progress-fill" style="width:88%; background:var(--success)"></div></div></td>
+            <td><span class="badge badge-muted">Uj</span></td>
+            <td class="flex gap-8">
+              <button class="btn btn-success btn-sm">Jovahagy</button>
+              <button class="btn btn-danger btn-sm">Elutasit</button>
+            </td>
+          </tr>
+          <tr>
+            <td><div class="thumb-sm"></div></td>
+            <td>Yellow Vandals</td>
+            <td>blazeone</td>
+            <td>47.504, 19.050</td>
+            <td><div class="progress-track confidence-bar"><div class="progress-fill" style="width:57%; background:var(--yellow)"></div></div></td>
+            <td><span class="badge badge-yellow">Civil megerositesre var</span></td>
+            <td class="flex gap-8">
+              <button class="btn btn-success btn-sm">Jovahagy</button>
+              <button class="btn btn-danger btn-sm">Elutasit</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

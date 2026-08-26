@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.tag_submit') }} - Graffiti Wars{% endblock %}
+{% block content %}
+<div class="container section" style="max-width:520px">
+  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('tag.submit_title', band=current_user.band.name) }}</h1>
+
+  <form method="POST" enctype="multipart/form-data" class="card" id="uploadForm">
+    <div class="field mb-24">
+      <label>{{ t('tag.field_photo') }}</label>
+      <input type="file" name="photo" accept="image/*" capture="environment" required />
+      <p style="font-size:12px; margin-top:6px">{{ t('tag.upload_help') }}</p>
+    </div>
+    <input type="hidden" name="client_now" id="clientNow" />
+    <button type="submit" class="btn btn-primary btn-block">{{ t('tag.submit_button') }}</button>
+  </form>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  document.getElementById("uploadForm").addEventListener("submit", () => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const local =
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` +
+      `T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    document.getElementById("clientNow").value = local;
+  });
+</script>
+{% endblock %}

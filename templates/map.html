@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.map') }} - Graffiti Wars{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  .app-layout { display: grid; grid-template-columns: 300px 1fr; height: calc(100vh - 61px); }
+  .sidebar { background: var(--bg-elevated); border-right: 1px solid var(--border); padding: 20px; overflow-y: auto; }
+  .sidebar h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); margin-bottom: 12px; font-family: var(--font-body); }
+  .mini-band-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .mini-band-row:last-child { border-bottom: none; }
+  .swatch { width: 14px; height: 14px; border-radius: 4px; }
+  .map-wrap { position: relative; }
+  #mainMap { width: 100%; height: 100%; }
+  .member-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+  .member-rank { width: 18px; color: var(--text-faint); font-weight: 700; }
+
+  @media (max-width: 768px) {
+    .app-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .sidebar { max-height: 38vh; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="app-layout">
+  <aside class="sidebar">
+    {% if current_user.is_authenticated %}
+      {% if not current_user.is_civilian %}
+      <h4>{{ t('map.your_gang_title') }}</h4>
+      <div class="card mb-24" style="padding:16px">
+        <div class="flex items-center gap-12 mb-16">
+          <div class="tag-swatch avatar" style="width:38px;height:38px;background:{{ current_user.band.color }}"></div>
+          <div>
+            <a href="{{ url_for('bands.band_detail', band_id=current_user.band.id) }}" style="font-weight:700">{{ current_user.band.name }}</a>
+            <div class="text-muted" style="font-size:12px">
+              {{ current_user.band.members | length }} {{ t('common.member') if current_user.band.members | length == 1 else t('common.members') }}
+            </div>
+          </div>
+        </div>
+
+        <h4 style="margin-top:4px">{{ t('map.member_ranking_title') }}</h4>
+        {% for row in member_ranking %}
+        <div class="member-row">
+          <div class="member-rank">{{ loop.index }}</div>
+          <div style="flex:1">{{ row.username }}</div>
+          <div class="text-muted">{{ row.approved_count }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="card mb-24" style="padding:16px">
+        <p class="mb-16">{{ t('map.no_gang_prompt') }}</p>
+        <a href="{{ url_for('bands.list_bands') }}" class="btn btn-secondary btn-block btn-sm">{{ t('map.browse_gangs') }}</a>
+      </div>
+      {% endif %}
+    {% else %}
+      <div class="card mb-24" style="padding:16px">
+        <p class="mb-16">{{ t('map.login_prompt') }}</p>
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-block btn-sm">{{ t('nav.login') }}</a>
+      </div>
+    {% endif %}
+
+    <h4>{{ t('map.leaderboard_title') }}</h4>
+    <div id="leaderboardList"></div>
+  </aside>
+
+  <div class="map-wrap">
+    <div id="mainMap"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const territoriesByBand = {};
+  let visibleBandIds = new Set();
+
+  function renderLeaderboard() {
+    const container = document.getElementById("leaderboardList");
+    container.innerHTML = "";
+
+    const rows = Array.from(visibleBandIds)
+      .map((bandId) => territoriesByBand[bandId])
+      .filter(Boolean)
+      .sort((a, b) => b.area_km2 - a.area_km2);
+
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "text-muted";
+      empty.style.fontSize = "13px";
+      empty.textContent = {{ t('map.no_territory') | tojson }};
+      container.appendChild(empty);
+      return;
+    }
+
+    rows.forEach((territory) => {
+      const row = document.createElement("div");
+      row.className = "mini-band-row";
+
+      const swatch = document.createElement("div");
+      swatch.className = "swatch";
+      swatch.style.background = territory.color;
+
+      const link = document.createElement("a");
+      link.href = `/bands/${territory.band_id}`;
+      link.style.flex = "1";
+      link.textContent = territory.band_name;
+
+      const area = document.createElement("div");
+      area.className = "text-muted";
+      area.textContent = `${territory.area_km2.toFixed(2)} km2`;
+
+      row.appendChild(swatch);
+      row.appendChild(link);
+      row.appendChild(area);
+      container.appendChild(row);
+    });
+  }
+
+  initLiveMap("mainMap", {
+    zoom: 13,
+    viewportFiltered: true,
+    onTerritoriesLoaded: (territories) => {
+      territories.forEach((territory) => {
+        territoriesByBand[territory.band_id] = territory;
+      });
+      renderLeaderboard();
+    },
+    onTagsUpdate: (bandIds) => {
+      visibleBandIds = bandIds;
+      renderLeaderboard();
+    },
+  });
+</script>
+{% endblock %}

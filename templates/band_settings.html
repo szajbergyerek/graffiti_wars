@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.band_settings') }} - Graffiti Wars{% endblock %}
+{% block content %}
+<div class="container section" style="max-width:560px">
+  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('band.settings_title') }} - {{ band.name }}</h1>
+
+  <form method="POST" enctype="multipart/form-data" class="card mb-24">
+    <div class="field">
+      <label>{{ t('band.field_description') }}</label>
+      <textarea name="description" rows="3">{{ band.description or "" }}</textarea>
+    </div>
+
+    <div class="field">
+      <label>{{ t('band.field_reference_image_change') }}</label>
+      <div class="flex items-center gap-12 mb-8">
+        <img src="{{ band.reference_image.url }}" style="width:56px;height:56px;object-fit:cover;border-radius:8px" />
+        <input type="file" name="reference_image" accept="image/*" />
+      </div>
+      <p style="font-size:12px">{{ t('band.field_image_help') }}</p>
+    </div>
+
+    <div class="field">
+      <label>{{ t('band.field_banner') }}</label>
+      <input type="file" name="banner" accept="image/*" />
+      <p style="font-size:12px; margin-top:6px">{{ t('band.field_image_help') }}</p>
+    </div>
+
+    <div class="field">
+      <label>{{ t('band.field_nationality') }}</label>
+      <select name="nationality_code">
+        <option value="">{{ t('band.nationality_none') }}</option>
+        {% for country in countries %}
+        <option value="{{ country.code }}" {{ "selected" if band.nationality_code == country.code else "" }}>
+          {{ country.flag }} {{ country.hu if g.locale == "hu" else country.en }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field mb-24">
+      <label>{{ t('band.field_join_policy') }}</label>
+      <label class="flex items-center gap-8 mb-8" style="cursor:pointer">
+        <input type="radio" name="join_policy" value="open" {{ "checked" if band.join_policy == "open" else "" }} style="width:auto" />
+        <span style="font-weight:400; color:var(--text)">{{ t('band.join_policy_open') }}</span>
+      </label>
+      <label class="flex items-center gap-8 mb-8" style="cursor:pointer">
+        <input type="radio" name="join_policy" value="request" {{ "checked" if band.join_policy == "request" else "" }} style="width:auto" />
+        <span style="font-weight:400; color:var(--text)">{{ t('band.join_policy_request') }}</span>
+      </label>
+      <label class="flex items-center gap-8" style="cursor:pointer">
+        <input type="radio" name="join_policy" value="invite" {{ "checked" if band.join_policy == "invite" else "" }} style="width:auto" />
+        <span style="font-weight:400; color:var(--text)">{{ t('band.join_policy_invite') }}</span>
+      </label>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">{{ t('profile.save_button') }}</button>
+  </form>
+
+  <h2 style="font-size:18px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.members_management_title') }}</h2>
+  <div class="card" style="padding:0">
+    <table>
+      <thead><tr><th>{{ t('band.table_user') }}</th><th>{{ t('band.table_role') }}</th><th>{{ t('admin.table_action') }}</th></tr></thead>
+      <tbody>
+        {% for member in band.members %}
+        <tr>
+          <td><a href="{{ url_for('profile.user_profile', username=member.username) }}">{{ member.username }}</a></td>
+          <td><span class="badge {{ 'badge-pink' if member.band_role == 'leader' else 'badge-muted' }}">{{ t('band.role_leader') if member.band_role == "leader" else t('band.role_member') }}</span></td>
+          <td>
+            {% if member.id != current_user.id %}
+            <form method="POST" action="{{ url_for('bands.kick_member', band_id=band.id, user_id=member.id) }}" onsubmit="return confirm('{{ t('band.confirm_kick') }}');">
+              <button class="btn btn-danger btn-sm">{{ t('band.kick_button') }}</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

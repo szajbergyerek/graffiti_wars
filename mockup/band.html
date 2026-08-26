@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nitro Kings - Graffiti Wars</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .band-banner {
+    height: 260px;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, rgba(255,46,108,0.55), rgba(140,82,255,0.55)),
+      repeating-linear-gradient(45deg, #1b1b24, #1b1b24 20px, #23232f 20px, #23232f 40px);
+    display: flex;
+    align-items: flex-end;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .band-banner .band-title {
+    font-size: 42px;
+  }
+  #bandMiniMap { height: 260px; border-radius: var(--radius); border: 1px solid var(--border); }
+  .member-contrib-bar { width: 120px; }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo"><span>GRAFFITI</span><span class="dot">WARS</span></div>
+  <div class="navbar-links">
+    <a href="map.html">Terkep</a>
+    <a href="band.html" class="active">Bandak</a>
+    <a href="index.html#stats">Statisztikak</a>
+    <a href="index.html#feed">Hirfal</a>
+    <a href="profile.html">Profil</a>
+  </div>
+  <div class="navbar-actions">
+    <img class="avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=user" width="34" height="34" alt="avatar" />
+  </div>
+</nav>
+
+<div class="container section">
+
+  <div class="band-banner mb-32">
+    <div>
+      <div class="badge badge-pink mb-8">#3 a toplistan</div>
+      <h1 class="band-title">Nitro Kings</h1>
+      <p style="color:#e8e6ee">Alapitva: 2025.03.12 - 6 aktiv tag</p>
+    </div>
+  </div>
+
+  <div class="grid grid-4 mb-32">
+    <div class="stat-card">
+      <div class="stat-value stat-pink">2.8 km2</div>
+      <div class="stat-label">Lefedett terulet</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value stat-cyan">6</div>
+      <div class="stat-label">Aktiv tag</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value stat-yellow">29</div>
+      <div class="stat-label">Hitelesitett tag pont</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value stat-purple">4</div>
+      <div class="stat-label">Osszefuggo tagpont</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2 mb-32">
+    <div>
+      <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">Terulet a terkepen</h2>
+      <div id="bandMiniMap" data-init-map data-interactive="false" data-zoom="14"></div>
+    </div>
+    <div>
+      <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">Aktivitas</h2>
+      <div class="card">
+        <div class="feed-item" style="display:flex; gap:14px; padding:14px 0; border-bottom:1px solid var(--border)">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--success);margin-top:6px"></div>
+          <div><div>Uj pont hitelesitve a Rakoczi uton</div><div class="text-muted" style="font-size:12px">2 oraja - reflex</div></div>
+        </div>
+        <div class="feed-item" style="display:flex; gap:14px; padding:14px 0; border-bottom:1px solid var(--border)">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--danger);margin-top:6px"></div>
+          <div><div>Elvesztett pont a Cyan Ghosts ellen</div><div class="text-muted" style="font-size:12px">1 napja - sprayqueen</div></div>
+        </div>
+        <div class="feed-item" style="display:flex; gap:14px; padding:14px 0">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--success);margin-top:6px"></div>
+          <div><div>Uj tag csatlakozott: writerX</div><div class="text-muted" style="font-size:12px">3 napja</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">Tagok es hozzajarulas</h2>
+  <div class="card" style="padding:0">
+    <table>
+      <thead>
+        <tr><th>Felhasznalo</th><th>Csatlakozott</th><th>Hitelesitett pontok</th><th>Hozzajarulas</th><th>Szerep</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="flex items-center gap-12"><img class="avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=reflex" width="28" height="28" /> reflex</td>
+          <td>2025.03.12</td>
+          <td>11</td>
+          <td><div class="progress-track member-contrib-bar"><div class="progress-fill" style="width:38%"></div></div></td>
+          <td><span class="badge badge-pink">Vezeto</span></td>
+        </tr>
+        <tr>
+          <td class="flex items-center gap-12"><img class="avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=sprayqueen" width="28" height="28" /> sprayqueen</td>
+          <td>2025.03.20</td>
+          <td>8</td>
+          <td><div class="progress-track member-contrib-bar"><div class="progress-fill" style="width:28%"></div></div></td>
+          <td><span class="badge badge-muted">Tag</span></td>
+        </tr>
+        <tr>
+          <td class="flex items-center gap-12"><img class="avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=writerX" width="28" height="28" /> writerX</td>
+          <td>2026.08.23</td>
+          <td>2</td>
+          <td><div class="progress-track member-contrib-bar"><div class="progress-fill" style="width:7%"></div></div></td>
+          <td><span class="badge badge-muted">Tag</span></td>
+        </tr>
+        <tr>
+          <td class="flex items-center gap-12"><img class="avatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=beton" width="28" height="28" /> betonvirag</td>
+          <td>2025.05.02</td>
+          <td>8</td>
+          <td><div class="progress-track member-contrib-bar"><div class="progress-fill" style="width:27%"></div></div></td>
+          <td><span class="badge badge-muted">Tag</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>
+  <div class="container">
+    <div class="logo" style="font-size:16px"><span>GRAFFITI</span><span class="dot">WARS</span></div>
+    <p>&copy; 2026 Graffiti Wars. A feltoltott tartalomert a feltolto felel.</p>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

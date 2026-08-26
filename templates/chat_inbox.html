@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ t('title.chat') }} - Graffiti Wars{% endblock %}
+{% block content %}
+<div class="container section" style="max-width:640px">
+  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('chat.inbox_title') }}</h1>
+
+  <div class="card" style="padding:0">
+    {% for item in items %}
+    <a href="{{ url_for('chat.conversation_view', conversation_id=item.conversation.id) }}"
+       class="flex items-center gap-12" style="padding:16px; border-bottom:1px solid var(--border)">
+      <img class="avatar" src="{{ item.avatar_url or 'https://api.dicebear.com/7.x/shapes/svg?seed=' ~ (item.title | urlencode) }}" width="44" height="44" />
+      <div style="flex:1">
+        <div class="flex items-center gap-8">
+          <div style="font-weight:700">{{ item.title }}</div>
+          {% if item.conversation.kind == "band" %}<span class="badge badge-muted">{{ t('chat.band_chat_label') }}</span>{% endif %}
+        </div>
+        <div class="text-muted" style="font-size:13px">
+          {% if item.last_message %}
+            {{ item.last_message.sender.username }}: {{ item.last_message.body[:60] }}
+          {% else %}
+            {{ t('chat.no_messages_yet') }}
+          {% endif %}
+        </div>
+      </div>
+    </a>
+    {% else %}
+    <p class="text-muted" style="padding:16px">{{ t('chat.empty_inbox') }}</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
