@@ -1,3 +1,5 @@
+# v1.0.0
+
 services:
   db:
     image: postgres:16-alpine
@@ -16,9 +18,6 @@ services:
 
   web:
     build: .
-    # If you'd rather not have Portainer build from source, push the image to a
-    # registry (e.g. GHCR) and swap the line above for:
-    #   image: ghcr.io/<you>/graffiti-wars:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -33,10 +32,9 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?set GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?set GOOGLE_CLIENT_SECRET}
     ports:
-      - "5000:5000"
+      - "2432:5000"
     volumes:
-      - images_data:/app/assets/images
+      - /STORAGE/docker/graffiti_wars:/app/assets
 
 volumes:
   db_data:
-  images_data:
