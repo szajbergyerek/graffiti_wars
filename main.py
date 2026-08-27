@@ -54,6 +54,17 @@ def create_app() -> Flask:
     app.jinja_env.globals["t"] = t
     app.jinja_env.globals["country_by_code"] = COUNTRY_BY_CODE
 
+    def _unread_chat_count() -> int:
+        from flask_login import current_user
+
+        if not current_user.is_authenticated:
+            return 0
+        from library.services.chat_service import ChatService
+
+        return ChatService().unread_count(current_user)
+
+    app.jinja_env.globals["unread_chat_count"] = _unread_chat_count
+
     @app.before_request
     def _resolve_locale():
         g.locale = translator.resolve_locale(request.accept_languages)
@@ -81,6 +92,11 @@ def create_app() -> Flask:
         from library.models.image import Image
         from library.models.landmark import Landmark
         from library.models.news_feed_event import NewsFeedEvent
+        from library.models.poll import Poll
+        from library.models.poll_option import PollOption
+        from library.models.poll_vote import PollVote
+        from library.models.tag_comment import TagComment
+        from library.models.tag_like import TagLike
         from library.models.tag_point import TagPoint
         from library.models.tag_report import TagReport
         from library.models.user import User

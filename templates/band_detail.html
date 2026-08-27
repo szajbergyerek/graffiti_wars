@@ -1,41 +1,52 @@
 {% extends "base.html" %}
 {% block title %}{{ band.name }} - Graffiti Wars{% endblock %}
+{% block header_nav %}
+<a href="{{ url_for('bands.list_bands') }}" class="app-header-back">
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+</a>
+{% endblock %}
+{% block header_title %}{{ band.name }}{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  .band-banner {
-    height: 220px; border-radius: var(--radius); background-size: cover; background-position: center;
+  .band-banner-full {
+    height: 220px; background-size: cover; background-position: center;
     display: flex; align-items: flex-end; padding: 24px; position: relative;
   }
-  .band-banner::before {
-    content: ""; position: absolute; inset: 0; border-radius: var(--radius);
-    background: linear-gradient(to top, rgba(11,11,16,0.85), rgba(11,11,16,0.2));
+  .band-banner-full::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(11,11,16,0.9), rgba(11,11,16,0.1));
   }
-  .band-banner > * { position: relative; z-index: 1; }
+  .band-banner-full::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+    background: var(--band-accent);
+  }
+  .band-banner-full > * { position: relative; z-index: 1; }
   #bandMiniMap { height: 320px; border-radius: var(--radius); border: 1px solid var(--border); }
 </style>
 {% endblock %}
 {% block content %}
-<div class="container section">
-
-  <div class="band-banner mb-32" style="background-image:url('{{ band.banner_image.url if band.banner_image else band.reference_image.url }}')">
-    <div>
-      <div class="flex items-center gap-8">
-        <h1 style="font-size:36px">{{ band.name }}</h1>
-        {% if band.nationality_code and country_by_code.get(band.nationality_code) %}
-        <span style="font-size:28px" title="{{ country_by_code[band.nationality_code].hu if g.locale == 'hu' else country_by_code[band.nationality_code].en }}">{{ country_by_code[band.nationality_code].flag }}</span>
-        {% endif %}
-      </div>
-      <p style="color:#e8e6ee">
-        {{ t('band.founded_on', date=band.created_at.strftime("%Y.%m.%d")) }} -
-        {{ members | length }} {{ t('common.member') if members | length == 1 else t('common.members') }}
-      </p>
-    </div>
+{% if band.banner_image %}
+<div class="band-banner-full" style="--band-accent:{{ band.color }}; background-image:url('{{ band.banner_image.url }}')">
+{% else %}
+<div class="band-banner-full" style="--band-accent:{{ band.color }}; background:linear-gradient(135deg, {{ band.color }}, var(--bg))">
+{% endif %}
+  <div>
+    <h1 style="font-size:32px">{{ band.name }}</h1>
+    <p style="color:#e8e6ee">
+      {{ t('band.founded_on', date=band.created_at.strftime("%Y.%m.%d")) }}
+      {% if band.nationality_code and country_by_code.get(band.nationality_code) %}
+      &middot; <img class="flag-icon" src="{{ country_by_code[band.nationality_code].flag_icon }}" alt="" /> {{ country_by_code[band.nationality_code].hu if g.locale == 'hu' else country_by_code[band.nationality_code].en }}
+      {% endif %}
+    </p>
   </div>
+</div>
+
+<div class="container section" style="padding-top:20px">
 
   {% if current_user.is_authenticated %}
     {% if current_user.band_id == band.id %}
-      <div class="flex gap-12 mb-32">
+      <div class="flex gap-12 mb-32" style="justify-content:center">
         <a href="{{ url_for('chat.start_band', band_id=band.id) }}" class="btn btn-primary">{{ t('nav.chat') }}</a>
         {% if is_leader %}
         <a href="{{ url_for('bands.band_settings', band_id=band.id) }}" class="btn btn-secondary">{{ t('band.settings_button') }}</a>
@@ -46,14 +57,14 @@
       </div>
     {% elif current_user.is_civilian and band.join_policy == "open" %}
       <form method="POST" action="{{ url_for('bands.join_band', band_id=band.id) }}" class="mb-32">
-        <button class="btn btn-primary">{{ t('band.join_button') }}</button>
+        <button class="btn btn-primary btn-block">{{ t('band.join_button') }}</button>
       </form>
     {% elif current_user.is_civilian and band.join_policy == "request" %}
       {% if own_pending_request %}
-        <p class="mb-32 text-muted">{{ t('band.request_pending') }}</p>
+        <p class="mb-32 text-muted text-center">{{ t('band.request_pending') }}</p>
       {% else %}
         <form method="POST" action="{{ url_for('bands.request_join', band_id=band.id) }}" class="mb-32">
-          <button class="btn btn-primary">{{ t('band.request_join_button') }}</button>
+          <button class="btn btn-primary btn-block">{{ t('band.request_join_button') }}</button>
         </form>
       {% endif %}
     {% endif %}
@@ -90,11 +101,11 @@
   </div>
   {% endif %}
 
-  <div class="grid grid-4 mb-32">
-    <div class="stat-card"><div class="stat-value" style="color:{{ band.color }}">{{ territory.area_km2 | round(2) if territory else 0 }} km2</div><div class="stat-label">{{ t('band.stat_area') }}</div></div>
-    <div class="stat-card"><div class="stat-value stat-cyan">{{ members | length }}</div><div class="stat-label">{{ t('band.stat_members') }}</div></div>
-    <div class="stat-card"><div class="stat-value stat-yellow">{{ total_approved }}</div><div class="stat-label">{{ t('band.stat_verified_points') }}</div></div>
-    <div class="stat-card">
+  <div class="stat-row">
+    <div class="stat-row-item"><div class="stat-value" style="color:{{ band.color }}">{{ territory.area_km2 | round(2) if territory else 0 }} km2</div><div class="stat-label">{{ t('band.stat_area') }}</div></div>
+    <div class="stat-row-item"><div class="stat-value stat-cyan">{{ member_count }}</div><div class="stat-label">{{ t('band.stat_members') }}</div></div>
+    <div class="stat-row-item"><div class="stat-value stat-yellow">{{ total_approved }}</div><div class="stat-label">{{ t('band.stat_verified_points') }}</div></div>
+    <div class="stat-row-item">
       <div class="stat-value stat-purple">
         {% if band.join_policy == "open" %}{{ t('band.open_badge') }}{% elif band.join_policy == "request" %}{{ t('band.request_badge') }}{% else %}{{ t('band.invite_badge') }}{% endif %}
       </div>
@@ -103,60 +114,124 @@
   </div>
 
   <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.map_title') }}</h2>
-  <div id="bandMiniMap" class="mb-32" data-init-map data-interactive="false" data-zoom="14" data-band-filter="{{ band.id }}"></div>
+  <div id="bandMiniMap" class="mb-32"></div>
 
-  <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.landmarks_title') }}</h2>
-  {% if landmarks_by_category %}
-  <div class="grid grid-3 mb-32">
-    {% for category in landmark_categories %}
-    {% set items = landmarks_by_category.get(category, []) %}
-    <details class="card">
-      <summary style="cursor:pointer; font-weight:700">
-        {{ t('category.' + category) }}
-        <span class="badge badge-muted" style="margin-left:6px">{{ items | length }}</span>
-      </summary>
-      <div class="mt-16" style="margin-top:12px; max-height:200px; overflow-y:auto">
-        {% for landmark in items %}
-        <div class="text-muted" style="font-size:13px; padding:4px 0; border-bottom:1px solid var(--border)">
-          {{ landmark.name or t('band.landmark_unnamed') }}
-          <span style="opacity:0.6">({{ landmark.subtype }})</span>
-        </div>
-        {% endfor %}
-      </div>
-    </details>
-    {% endfor %}
+  <div class="flex items-center gap-8 mb-16">
+    <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800">{{ t('band.landmarks_title') }}</h2>
+    {% if landmark_count > 0 %}<span class="badge badge-muted">{{ landmark_count }}</span>{% endif %}
   </div>
+  {% if landmark_count > 0 %}
+  <div class="card mb-32" style="padding:0; max-height:320px; overflow-y:auto" id="landmarkListCard"></div>
   {% else %}
   <p class="text-muted mb-32">{{ t('band.landmarks_empty') }}</p>
   {% endif %}
 
   <h2 style="font-size:20px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.members_title') }}</h2>
-  <div class="card" style="padding:0">
-    <table>
+  <div class="card" style="overflow-x:auto; max-width:100%; padding:0">
+    <table class="table-compact">
       <thead><tr><th>{{ t('band.table_user') }}</th><th>{{ t('band.table_joined') }}</th><th>{{ t('band.table_verified') }}</th><th>{{ t('band.table_role') }}</th>{% if is_leader %}<th>{{ t('admin.table_action') }}</th>{% endif %}</tr></thead>
-      <tbody>
-        {% for member in members %}
-        <tr>
-          <td><a href="{{ url_for('profile.user_profile', username=member.username) }}">{{ member.username }}</a></td>
-          <td>{{ member.band_joined_at.strftime("%Y.%m.%d") if member.band_joined_at else "-" }}</td>
-          <td>{{ approved_counts.get(member.id, 0) }}</td>
-          <td><span class="badge {{ 'badge-pink' if member.band_role == 'leader' else 'badge-muted' }}">{{ t('band.role_leader') if member.band_role == "leader" else t('band.role_member') }}</span></td>
-          {% if is_leader %}
-          <td>
-            {% if member.id != current_user.id %}
-            <form method="POST" action="{{ url_for('bands.kick_member', band_id=band.id, user_id=member.id) }}" onsubmit="return confirm('{{ t('band.confirm_kick') }}');">
-              <button class="btn btn-danger btn-sm">{{ t('band.kick_button') }}</button>
-            </form>
-            {% endif %}
-          </td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-      </tbody>
+      <tbody id="membersTableBody"></tbody>
     </table>
   </div>
 </div>
 {% endblock %}
 {% block extra_scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const bandDetailId = {{ band.id }};
+  const bandIsLeader = {{ is_leader | tojson }};
+  const bandRoleLeaderLabel = {{ t('band.role_leader') | tojson }};
+  const bandRoleMemberLabel = {{ t('band.role_member') | tojson }};
+  const bandConfirmKick = {{ t('band.confirm_kick') | tojson }};
+  const bandKickButtonLabel = {{ t('band.kick_button') | tojson }};
+
+  initInfiniteList({
+    container: document.getElementById("membersTableBody"),
+    fetchPage: (offset, limit) =>
+      fetch(`/bands/${bandDetailId}/api/members?offset=${offset}&limit=${limit}`).then((r) => (r.ok ? r.json() : [])),
+    renderItem: (member) => {
+      const row = document.createElement("tr");
+      const roleBadgeClass = member.role === "leader" ? "badge-pink" : "badge-muted";
+      const roleLabel = member.role === "leader" ? bandRoleLeaderLabel : bandRoleMemberLabel;
+
+      let actionCell = "";
+      if (bandIsLeader) {
+        actionCell = `<td>${
+          member.can_kick
+            ? `<form method="POST" action="/bands/${bandDetailId}/members/${member.user_id}/kick" data-confirm-kick="1">
+                 <button class="btn btn-danger btn-sm">${escapeHtml(bandKickButtonLabel)}</button>
+               </form>`
+            : ""
+        }</td>`;
+      }
+
+      row.innerHTML = `
+        <td><a href="/users/${encodeURIComponent(member.username)}">${escapeHtml(member.username)}</a></td>
+        <td>${member.joined_at || "-"}</td>
+        <td>${member.verified_count}</td>
+        <td><span class="badge ${roleBadgeClass}">${escapeHtml(roleLabel)}</span></td>
+        ${actionCell}
+      `;
+
+      const kickForm = row.querySelector("[data-confirm-kick]");
+      if (kickForm) {
+        kickForm.addEventListener("submit", (e) => {
+          if (!confirm(bandConfirmKick)) e.preventDefault();
+        });
+      }
+
+      return row;
+    },
+  });
+
+  const landmarkCategoryIcons = {
+    amenity: '<path d="M3 8h14v5a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5V8Z"/><path d="M17 8h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2"/><path d="M6 2v2M10 2v2M14 2v2"/>',
+    shop: '<path d="M4 8h16l-1.2 12.5a2 2 0 0 1-2 1.5H7.2a2 2 0 0 1-2-1.5L4 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/>',
+    tourism: '<path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/>',
+    leisure: '<path d="M11 20A7 7 0 0 1 4 13c0-6 7-11 7-11s7 5 7 11a7 7 0 0 1-7 7Z"/><path d="M11 20v-9"/>',
+    historic: '<path d="M3 21h18"/><path d="M5 21V10M9 21V10M15 21V10M19 21V10"/><path d="M3 10l9-6 9 6"/>',
+    office: '<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  };
+
+  const bandMiniMap = initLiveMap("bandMiniMap", { interactive: true, zoom: 14, bandFilter: bandDetailId });
+  let landmarkHighlight = null;
+
+  function locateLandmarkOnMap(landmark) {
+    if (!bandMiniMap) return;
+    document.getElementById("bandMiniMap").scrollIntoView({ behavior: "smooth", block: "center" });
+    bandMiniMap.setView([landmark.lat, landmark.lon], 17);
+    if (landmarkHighlight) bandMiniMap.removeLayer(landmarkHighlight);
+    landmarkHighlight = L.circleMarker([landmark.lat, landmark.lon], {
+      radius: 10,
+      color: "#fff",
+      weight: 3,
+      fillColor: "#ffcc00",
+      fillOpacity: 0.9,
+    }).addTo(bandMiniMap);
+  }
+
+  const landmarkListCard = document.getElementById("landmarkListCard");
+  if (landmarkListCard) {
+    initInfiniteList({
+      container: landmarkListCard,
+      scrollParent: landmarkListCard,
+      fetchPage: (offset, limit) =>
+        fetch(`/bands/${bandDetailId}/api/landmarks?offset=${offset}&limit=${limit}`).then((r) => (r.ok ? r.json() : [])),
+      renderItem: (landmark) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "list-cell";
+        row.innerHTML = `
+          <div class="list-cell-leading"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${landmarkCategoryIcons[landmark.category] || ""}</svg></div>
+          <div class="list-cell-body">
+            <div class="list-cell-title">${escapeHtml(landmark.name)}</div>
+            <div class="list-cell-subtitle">${escapeHtml(landmark.subtype || "")}</div>
+          </div>
+        `;
+        row.addEventListener("click", () => locateLandmarkOnMap(landmark));
+        return row;
+      },
+    });
+  }
+</script>
 {% endblock %}

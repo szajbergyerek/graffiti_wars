@@ -1,6 +1,7 @@
 import json
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy.orm import joinedload
 
 from library.models.band_territory import BandTerritory
 from library.models.tag_point import TagPoint
@@ -29,8 +30,13 @@ def _parse_bbox(raw_bbox: str):
 
 @bp_map_api.route("/territories.geojson")
 def territories_geojson():
+    query = BandTerritory.query.options(joinedload(BandTerritory.band))
+    band_id = request.args.get("band_id", type=int)
+    if band_id is not None:
+        query = query.filter_by(band_id=band_id)
+
     features = []
-    for territory in BandTerritory.query.all():
+    for territory in query.all():
         features.append(
             {
                 "type": "Feature",
@@ -48,7 +54,9 @@ def territories_geojson():
 
 @bp_map_api.route("/tags.geojson")
 def tags_geojson():
-    query = TagPoint.query.filter_by(status="approved")
+    query = TagPoint.query.filter_by(status="approved").options(
+        joinedload(TagPoint.band), joinedload(TagPoint.photo_image), joinedload(TagPoint.submitted_by)
+    )
 
     bbox = _parse_bbox(request.args.get("bbox"))
     if bbox is not None:
@@ -56,6 +64,10 @@ def tags_geojson():
         query = query.filter(
             TagPoint.lon >= west, TagPoint.lon <= east, TagPoint.lat >= south, TagPoint.lat <= north
         )
+
+    band_id = request.args.get("band_id", type=int)
+    if band_id is not None:
+        query = query.filter(TagPoint.band_id == band_id)
 
     features = []
     for point in query.all():
@@ -70,6 +82,7 @@ def tags_geojson():
                     "color": point.band.color,
                     "photo_url": point.photo_image.url if point.photo_image else None,
                     "created_at": point.created_at.isoformat(),
+                    "submitted_by": point.submitted_by.username,
                 },
             }
         )

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ t('tag.locate_title') }} - Graffiti Wars{% endblock %}
+{% block header_title %}{{ t('tag.locate_title') }}{% endblock %}
+{% block tab_bar %}{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
@@ -8,7 +10,6 @@
 {% endblock %}
 {% block content %}
 <div class="container section" style="max-width:640px">
-  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('tag.locate_title') }}</h1>
   <p class="mb-24">{{ t('tag.locate_help') }}</p>
 
   <div class="card">

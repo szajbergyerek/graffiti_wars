@@ -1,17 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ t('title.bands') }} - Graffiti Wars{% endblock %}
+{% block header_title %}{{ t('nav.bands') }}{% endblock %}
 {% block content %}
 <div class="container section">
-  <div class="flex justify-between items-center mb-32">
-    <h1 style="font-size:28px; font-family:var(--font-body); font-weight:800">{{ t('band.list_title') }}</h1>
-    {% if current_user.is_authenticated and current_user.is_civilian %}
-    <a href="{{ url_for('bands.create_band') }}" class="btn btn-primary">{{ t('band.new_button') }}</a>
-    {% endif %}
-  </div>
-
-  <form method="GET" id="bandFilterForm" class="card mb-24">
-    <div class="flex gap-12 mb-16">
-      <input type="text" name="q" value="{{ query_text }}" placeholder="{{ t('band.search_placeholder') }}" style="flex:1" />
+  <form method="GET" id="bandFilterForm">
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="search" name="q" value="{{ query_text }}" placeholder="{{ t('band.search_placeholder') }}" />
+    </div>
+    <div class="filter-chip-row">
       <select name="sort" onchange="this.form.submit()">
         <option value="newest" {{ "selected" if sort_key == "newest" else "" }}>{{ t('band.sort_newest') }}</option>
         <option value="oldest" {{ "selected" if sort_key == "oldest" else "" }}>{{ t('band.sort_oldest') }}</option>
@@ -24,49 +21,18 @@
         <option value="request" {{ "selected" if join_policy_filter == "request" else "" }}>{{ t('band.request_badge') }}</option>
         <option value="invite" {{ "selected" if join_policy_filter == "invite" else "" }}>{{ t('band.invite_badge') }}</option>
       </select>
-      <button type="submit" class="btn btn-secondary">{{ t('band.search_button') }}</button>
     </div>
-    <div class="flex gap-8 items-center">
-      <span class="text-muted" style="font-size:13px">{{ t('band.scope_label') }}:</span>
-      <button type="button" class="btn btn-sm {{ 'btn-primary' if scope == 'global' else 'btn-secondary' }}" onclick="setBandScope('global')">{{ t('leaderboard.tab_global') }}</button>
-      <button type="button" class="btn btn-sm {{ 'btn-primary' if scope == 'national' else 'btn-secondary' }}" onclick="setBandScope('national')">{{ t('leaderboard.tab_national') }}</button>
-      <button type="button" class="btn btn-sm {{ 'btn-primary' if scope == 'local' else 'btn-secondary' }}" onclick="setBandScope('local')">{{ t('leaderboard.tab_local') }}</button>
+    <div class="segmented mb-24">
+      <button type="button" class="segmented-item {{ 'active' if scope == 'global' else '' }}" onclick="setBandScope('global')">{{ t('leaderboard.tab_global') }}</button>
+      <button type="button" class="segmented-item {{ 'active' if scope == 'national' else '' }}" onclick="setBandScope('national')">{{ t('leaderboard.tab_national') }}</button>
+      <button type="button" class="segmented-item {{ 'active' if scope == 'local' else '' }}" onclick="setBandScope('local')">{{ t('leaderboard.tab_local') }}</button>
     </div>
     <input type="hidden" name="scope" id="scopeInput" value="{{ scope }}" />
     <input type="hidden" name="lat" id="latInput" value="{{ request.args.get('lat', '') }}" />
     <input type="hidden" name="lon" id="lonInput" value="{{ request.args.get('lon', '') }}" />
   </form>
 
-  <div class="grid grid-3">
-    {% for band in bands %}
-    <a href="{{ url_for('bands.band_detail', band_id=band.id) }}" class="card">
-      <div class="flex items-center gap-12 mb-16">
-        <div style="width:44px;height:44px;border-radius:10px;background:{{ band.color }}"></div>
-        <div>
-          <div style="font-weight:700">{{ band.name }}</div>
-          <div class="text-muted" style="font-size:12px">
-            {{ band.members | length }} {{ t('common.member') if band.members | length == 1 else t('common.members') }}
-          </div>
-        </div>
-      </div>
-      <p>{{ band.description or t('band.no_description') }}</p>
-      <div style="margin-top:16px">
-        <span class="badge" style="background:{{ band.color }}22; color:{{ band.color }}">
-          {{ band.territory.area_km2 | round(2) if band.territory else 0 }} km2
-        </span>
-        {% if band.join_policy == "open" %}
-        <span class="badge badge-success">{{ t('band.open_badge') }}</span>
-        {% elif band.join_policy == "request" %}
-        <span class="badge badge-yellow">{{ t('band.request_badge') }}</span>
-        {% else %}
-        <span class="badge badge-muted">{{ t('band.invite_badge') }}</span>
-        {% endif %}
-      </div>
-    </a>
-    {% else %}
-    <p class="text-muted">{{ t('band.none_yet') }}</p>
-    {% endfor %}
-  </div>
+  <div class="grid grid-3" id="bandsList"></div>
 </div>
 {% endblock %}
 {% block extra_scripts %}
@@ -87,5 +53,54 @@
       form.submit();
     }
   }
+
+  const bandBadges = {
+    open: `<span class="badge badge-success">${escapeHtml({{ t('band.open_badge') | tojson }})}</span>`,
+    request: `<span class="badge badge-yellow">${escapeHtml({{ t('band.request_badge') | tojson }})}</span>`,
+    invite: `<span class="badge badge-muted">${escapeHtml({{ t('band.invite_badge') | tojson }})}</span>`,
+  };
+
+  const bandsListParams = new URLSearchParams({
+    q: {{ query_text | tojson }},
+    sort: {{ sort_key | tojson }},
+    scope: {{ scope | tojson }},
+    join_policy: {{ join_policy_filter | tojson }},
+    lat: {{ request.args.get('lat', '') | tojson }},
+    lon: {{ request.args.get('lon', '') | tojson }},
+  });
+
+  initInfiniteList({
+    container: document.getElementById("bandsList"),
+    emptyMessage: {{ t('band.none_yet') | tojson }},
+    fetchPage: (offset, limit) => {
+      const params = new URLSearchParams(bandsListParams);
+      params.set("offset", offset);
+      params.set("limit", limit);
+      return fetch(`/bands/api/list?${params}`).then((r) => (r.ok ? r.json() : []));
+    },
+    renderItem: (band) => {
+      const card = document.createElement("a");
+      card.href = `/bands/${band.band_id}`;
+      card.className = "card";
+
+      const memberLabel = band.member_count === 1 ? {{ t('common.member') | tojson }} : {{ t('common.members') | tojson }};
+
+      card.innerHTML = `
+        <div class="flex items-center gap-12 mb-16">
+          <div style="width:44px;height:44px;border-radius:10px;background:${escapeHtml(band.color)}"></div>
+          <div>
+            <div style="font-weight:700">${escapeHtml(band.name)}</div>
+            <div class="text-muted" style="font-size:12px">${band.member_count} ${escapeHtml(memberLabel)}</div>
+          </div>
+        </div>
+        <p>${escapeHtml(band.description || {{ t('band.no_description') | tojson }})}</p>
+        <div style="margin-top:16px">
+          <span class="badge" style="background:${escapeHtml(band.color)}22; color:${escapeHtml(band.color)}">${band.area_km2} km2</span>
+          ${bandBadges[band.join_policy] || ""}
+        </div>
+      `;
+      return card;
+    },
+  });
 </script>
 {% endblock %}

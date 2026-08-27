@@ -16,6 +16,7 @@ class TagPoint(db.Model):
     lon = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(16), nullable=False, default="pending")
     ai_confidence = db.Column(db.Float, nullable=True)
+    area_added_km2 = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     reviewed_at = db.Column(db.DateTime, nullable=True)
     reviewed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)

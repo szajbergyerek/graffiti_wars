@@ -1,8 +1,9 @@
 from datetime import datetime
 from functools import wraps
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload, selectinload
 
 from library.extensions import db
 from library.models.admin_action import AdminAction
@@ -12,6 +13,7 @@ from library.models.chat_message import ChatMessage
 from library.models.conversation import Conversation
 from library.models.conversation_participant import ConversationParticipant
 from library.models.landmark import Landmark
+from library.models.news_feed_event import NewsFeedEvent
 from library.models.tag_point import TagPoint
 from library.models.tag_report import TagReport
 from library.models.user import User
@@ -43,8 +45,33 @@ def dashboard():
 @bp_admin.route("/queue")
 @admin_required
 def queue():
-    open_reports = TagReport.query.filter_by(resolved=False).order_by(TagReport.created_at.asc()).all()
-    return render_template("admin/queue.html", open_reports=open_reports)
+    return render_template("admin/queue.html")
+
+
+@bp_admin.route("/api/queue")
+@admin_required
+def queue_api():
+    offset = request.args.get("offset", type=int, default=0)
+    limit = min(request.args.get("limit", type=int, default=10), 50)
+    reports = (
+        TagReport.query.filter_by(resolved=False)
+        .order_by(TagReport.created_at.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return jsonify(
+        [
+            {
+                "report_id": report.id,
+                "tag_point_id": report.tag_point.id,
+                "band_name": report.tag_point.band.name,
+                "reporter": report.reported_by.username,
+                "reason": report.reason,
+            }
+            for report in reports
+        ]
+    )
 
 
 @bp_admin.route("/reports/<int:report_id>/resolve", methods=["POST"])
@@ -81,8 +108,35 @@ def resolve_report(report_id: int):
 @bp_admin.route("/users")
 @admin_required
 def users():
-    all_users = User.query.order_by(User.created_at.desc()).all()
-    return render_template("admin/users.html", users=all_users)
+    return render_template("admin/users.html")
+
+
+@bp_admin.route("/api/users")
+@admin_required
+def users_api():
+    offset = request.args.get("offset", type=int, default=0)
+    limit = min(request.args.get("limit", type=int, default=10), 50)
+    all_users = (
+        User.query.options(joinedload(User.band))
+        .order_by(User.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return jsonify(
+        [
+            {
+                "user_id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "band_name": user.band.name if user.band else None,
+                "registered_at": user.created_at.strftime("%Y.%m.%d"),
+                "is_admin": user.is_admin,
+                "is_banned": user.is_banned,
+            }
+            for user in all_users
+        ]
+    )
 
 
 @bp_admin.route("/users/<int:user_id>/toggle-ban", methods=["POST"])
@@ -105,8 +159,33 @@ def toggle_ban(user_id: int):
 @bp_admin.route("/bands")
 @admin_required
 def bands():
-    all_bands = Band.query.order_by(Band.created_at.desc()).all()
-    return render_template("admin/bands.html", bands=all_bands)
+    return render_template("admin/bands.html")
+
+
+@bp_admin.route("/api/bands")
+@admin_required
+def bands_api():
+    offset = request.args.get("offset", type=int, default=0)
+    limit = min(request.args.get("limit", type=int, default=10), 50)
+    all_bands = (
+        Band.query.options(joinedload(Band.territory), selectinload(Band.members))
+        .order_by(Band.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return jsonify(
+        [
+            {
+                "band_id": band.id,
+                "name": band.name,
+                "leaders": ", ".join(m.username for m in band.members if m.band_role == "leader"),
+                "member_count": len(band.members),
+                "area_km2": round(band.territory.area_km2, 2) if band.territory else 0,
+            }
+            for band in all_bands
+        ]
+    )
 
 
 @bp_admin.route("/bands/<int:band_id>/delete", methods=["POST"])
@@ -122,6 +201,7 @@ def delete_band(band_id: int):
     TagPoint.query.filter_by(band_id=band.id).delete()
     BandJoinRequest.query.filter_by(band_id=band.id).delete()
     Landmark.query.filter_by(band_id=band.id).delete()
+    NewsFeedEvent.query.filter_by(band_id=band.id).delete()
 
     band_conversation = Conversation.query.filter_by(kind="band", band_id=band.id).first()
     if band_conversation is not None:

@@ -1,45 +1,252 @@
 {% extends "base.html" %}
 {% block title %}{{ title }} - Graffiti Wars{% endblock %}
+{% block header_nav %}
+<a href="{{ url_for('chat.inbox') }}" class="app-header-back">
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+</a>
+{% endblock %}
+{% block header_title %}{{ title }}{% endblock %}
+{% block tab_bar %}{% endblock %}
 {% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  .chat-wrap { display: flex; flex-direction: column; height: calc(100vh - 61px - 144px); max-height: 640px; }
+  .app-content { display: flex; flex-direction: column; overflow: hidden; }
+  .chat-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .chat-title-bar {
+    padding: calc(env(safe-area-inset-top) + 14px) 60px 12px;
+    text-align: center;
+    font-weight: 800;
+    font-size: 16px;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-  .chat-bubble { max-width: 70%; padding: 10px 14px; border-radius: 14px; background: var(--bg-elevated); align-self: flex-start; }
+  .chat-bubble { max-width: 78%; padding: 10px 14px; border-radius: 14px; background: var(--bg-elevated); align-self: flex-start; }
   .chat-bubble.own { background: linear-gradient(135deg, var(--pink), var(--purple)); color: #fff; align-self: flex-end; }
   .chat-bubble .meta { font-size: 11px; opacity: 0.7; margin-bottom: 2px; }
-  .chat-form { display: flex; gap: 10px; padding: 16px; border-top: 1px solid var(--border); }
+  .chat-form { display: flex; gap: 8px; align-items: center; padding: 10px 12px calc(env(safe-area-inset-bottom) + 10px); border-top: 1px solid var(--border); }
   .chat-form input[type="text"] { flex: 1; }
+  .chat-attach-btn {
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 38px; height: 38px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border);
+    color: var(--text-muted); cursor: pointer;
+  }
+  .chat-attach-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+  .poll-widget { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+  .poll-question { font-weight: 800; margin-bottom: 4px; }
+  .poll-option {
+    position: relative; overflow: hidden; text-align: left; padding: 8px 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: inherit;
+    cursor: pointer; font-family: inherit; font-size: 13px;
+  }
+  .poll-option.voted { border-color: #fff; }
+  .poll-option-fill { position: absolute; inset: 0; background: rgba(255,255,255,0.18); z-index: 0; }
+  .poll-option-label, .poll-option-count { position: relative; z-index: 1; }
+  .poll-option-count { float: right; opacity: 0.8; font-size: 11px; }
+
+  .poll-modal .field { margin-bottom: 12px; }
+
+  .chat-location-overlay {
+    position: absolute; inset: 0; z-index: 20; background: var(--bg);
+    display: none; flex-direction: column;
+  }
+  .chat-location-overlay.open { display: flex; }
+  .chat-location-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: calc(env(safe-area-inset-top) + 14px) 16px 12px;
+    font-weight: 800; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .chat-location-header .app-header-back { position: static; }
+  #chatPickerMap { flex: 1; }
+  .chat-location-confirm { margin: 12px; margin-bottom: calc(env(safe-area-inset-bottom) + 12px); flex-shrink: 0; }
 </style>
 {% endblock %}
 {% block content %}
-<div class="container section" style="max-width:640px">
-  <a href="{{ url_for('chat.inbox') }}" class="text-muted" style="font-size:13px">&larr; {{ t('chat.back_to_inbox') }}</a>
-  <h1 style="font-size:24px; font-family:var(--font-body); font-weight:800" class="mb-16 mt-8">{{ title }}</h1>
+<div class="chat-wrap">
+  <div class="chat-title-bar">{{ title }}</div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <form class="chat-form" id="chatForm">
+    <label class="chat-attach-btn" for="chatImageInput" aria-label="{{ t('chat.attach_image') }}">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+    </label>
+    <input type="file" id="chatImageInput" accept="image/*" class="sr-only" />
+    <button type="button" class="chat-attach-btn" id="chatLocationBtn" aria-label="{{ t('chat.share_location') }}">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.58 7-12A7 7 0 0 0 5 9c0 4.42 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+    </button>
+    {% if conversation.kind == "band" %}
+    <button type="button" class="chat-attach-btn" id="chatPollBtn" aria-label="{{ t('chat.create_poll') }}">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/></svg>
+    </button>
+    {% endif %}
+    <input type="text" name="body" id="chatInput" placeholder="{{ t('chat.message_placeholder') }}" maxlength="2000" autocomplete="off" required />
+    <button type="submit" class="btn btn-primary">{{ t('chat.send_button') }}</button>
+  </form>
 
-  <div class="card chat-wrap" style="padding:0">
-    <div class="chat-messages" id="chatMessages">
-      {% for message in messages %}
-      <div class="chat-bubble {{ 'own' if message.sender_id == current_user.id else '' }}" data-message-id="{{ message.id }}">
-        <div class="meta">{{ message.sender.username }} - {{ message.created_at.strftime("%Y.%m.%d %H:%M") }}</div>
-        <div>{{ message.body }}</div>
-      </div>
-      {% else %}
-      <p class="text-muted">{{ t('chat.no_messages_yet') }}</p>
-      {% endfor %}
+  <div class="chat-location-overlay" id="chatLocationOverlay">
+    <div class="chat-location-header">
+      <button type="button" class="app-header-back" id="chatLocationBack">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span>{{ t('chat.share_location') }}</span>
     </div>
-    <form class="chat-form" id="chatForm">
-      <input type="text" name="body" id="chatInput" placeholder="{{ t('chat.message_placeholder') }}" maxlength="2000" autocomplete="off" required />
-      <button type="submit" class="btn btn-primary">{{ t('chat.send_button') }}</button>
+    <div id="chatPickerMap"></div>
+    <input type="hidden" id="chatPickerLat" />
+    <input type="hidden" id="chatPickerLon" />
+    <button type="button" class="btn btn-primary btn-block chat-location-confirm" id="chatLocationConfirm" disabled>{{ t('tag.accept_button') }}</button>
+  </div>
+</div>
+
+{% if conversation.kind == "band" %}
+<div class="modal-backdrop" id="pollModalBackdrop">
+  <div class="modal poll-modal">
+    <div class="modal-header">
+      <h3 style="font-size:16px; font-family:var(--font-body); font-weight:800">{{ t('chat.create_poll') }}</h3>
+      <button type="button" class="modal-close" onclick="toggleModal('pollModalBackdrop')">&times;</button>
+    </div>
+    <form id="pollForm">
+      <div class="field">
+        <input type="text" name="question" id="pollQuestionInput" placeholder="{{ t('chat.poll_question_placeholder') }}" maxlength="200" required />
+      </div>
+      <div id="pollOptionsList">
+        <div class="field"><input type="text" name="option" maxlength="100" placeholder="{{ t('chat.poll_option_placeholder', n=1) }}" required /></div>
+        <div class="field"><input type="text" name="option" maxlength="100" placeholder="{{ t('chat.poll_option_placeholder', n=2) }}" required /></div>
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm mb-16" id="pollAddOptionBtn">{{ t('chat.poll_add_option') }}</button>
+      <button type="submit" class="btn btn-primary btn-block">{{ t('chat.poll_create_button') }}</button>
     </form>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 {% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+  window.chatUiLabels = {
+    viewOnMap: {{ t('chat.view_on_map') | tojson }},
+    votes: {{ t('chat.poll_votes_label') | tojson }},
+  };
+
+  const chatConversationId = {{ conversation.id }};
+  const chatMessages = document.getElementById("chatMessages");
+  const initialMessages = {{ initial_messages | tojson }};
+
+  if (initialMessages.length) {
+    initialMessages.forEach((message) => appendChatMessage(chatMessages, message));
+  } else {
+    const empty = document.createElement("p");
+    empty.className = "text-muted";
+    empty.textContent = {{ t('chat.no_messages_yet') | tojson }};
+    chatMessages.appendChild(empty);
+  }
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
   initChatPolling(
-    {{ conversation.id }},
+    chatConversationId,
     {{ url_for('chat.send_message', conversation_id=conversation.id) | tojson }},
     {{ url_for('chat.api_messages', conversation_id=conversation.id) | tojson }}
   );
+  initChatHistoryLoader(
+    chatMessages,
+    {{ url_for('chat.api_history', conversation_id=conversation.id) | tojson }}
+  );
+
+  document.getElementById("chatImageInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("image", file);
+    fetch({{ url_for('chat.send_image', conversation_id=conversation.id) | tojson }}, { method: "POST", body: formData })
+      .then((r) => r.json())
+      .then((message) => {
+        if (message.id) {
+          appendChatMessage(chatMessages, message);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+      });
+    e.target.value = "";
+  });
+
+  const locationOverlay = document.getElementById("chatLocationOverlay");
+  const locationConfirmBtn = document.getElementById("chatLocationConfirm");
+  let pickedLat = null;
+  let pickedLon = null;
+  let pickerMapInitialized = false;
+
+  document.getElementById("chatLocationBtn").addEventListener("click", () => {
+    locationOverlay.classList.add("open");
+    if (!pickerMapInitialized) {
+      pickerMapInitialized = true;
+      initLocationPicker("chatPickerMap", "chatPickerLat", "chatPickerLon", (lat, lon) => {
+        pickedLat = lat;
+        pickedLon = lon;
+        locationConfirmBtn.disabled = false;
+      });
+    }
+  });
+
+  document.getElementById("chatLocationBack").addEventListener("click", () => {
+    locationOverlay.classList.remove("open");
+  });
+
+  locationConfirmBtn.addEventListener("click", () => {
+    if (pickedLat == null || pickedLon == null) return;
+    fetch({{ url_for('chat.send_location', conversation_id=conversation.id) | tojson }}, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `lat=${pickedLat}&lon=${pickedLon}`,
+    })
+      .then((r) => r.json())
+      .then((message) => {
+        if (message.id) {
+          appendChatMessage(chatMessages, message);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          locationOverlay.classList.remove("open");
+        }
+      });
+  });
+
+  {% if conversation.kind == "band" %}
+  const pollBtn = document.getElementById("chatPollBtn");
+  const pollOptionsList = document.getElementById("pollOptionsList");
+  const pollAddOptionBtn = document.getElementById("pollAddOptionBtn");
+
+  pollBtn.addEventListener("click", () => toggleModal("pollModalBackdrop"));
+
+  pollAddOptionBtn.addEventListener("click", () => {
+    const count = pollOptionsList.querySelectorAll("input").length;
+    if (count >= 4) return;
+    const field = document.createElement("div");
+    field.className = "field";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.name = "option";
+    input.maxLength = 100;
+    input.placeholder = `{{ t('chat.poll_option_placeholder', n='') }}${count + 1}`;
+    field.appendChild(input);
+    pollOptionsList.appendChild(field);
+    if (count + 1 >= 4) pollAddOptionBtn.style.display = "none";
+  });
+
+  document.getElementById("pollForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    fetch({{ url_for('chat.create_poll', conversation_id=conversation.id) | tojson }}, {
+      method: "POST",
+      body: new URLSearchParams(formData),
+    })
+      .then((r) => r.json())
+      .then((message) => {
+        if (message.id) {
+          appendChatMessage(chatMessages, message);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          toggleModal("pollModalBackdrop");
+          e.target.reset();
+        }
+      });
+  });
+  {% endif %}
 </script>
 {% endblock %}

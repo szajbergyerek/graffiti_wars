@@ -12,6 +12,7 @@ class ConversationParticipant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     conversation_id = db.Column(db.Integer, db.ForeignKey("conversations.id"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    last_read_message_id = db.Column(db.Integer, nullable=True)
 
     conversation = db.relationship("Conversation", back_populates="participants")
     user = db.relationship("User")

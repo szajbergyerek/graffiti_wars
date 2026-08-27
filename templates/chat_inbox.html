@@ -1,31 +1,49 @@
 {% extends "base.html" %}
 {% block title %}{{ t('title.chat') }} - Graffiti Wars{% endblock %}
+{% block header_nav %}
+<a href="{{ url_for('profile.my_profile') }}" class="app-header-back">
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+</a>
+{% endblock %}
+{% block header_title %}{{ t('chat.inbox_title') }}{% endblock %}
 {% block content %}
-<div class="container section" style="max-width:640px">
-  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('chat.inbox_title') }}</h1>
-
-  <div class="card" style="padding:0">
-    {% for item in items %}
-    <a href="{{ url_for('chat.conversation_view', conversation_id=item.conversation.id) }}"
-       class="flex items-center gap-12" style="padding:16px; border-bottom:1px solid var(--border)">
-      <img class="avatar" src="{{ item.avatar_url or 'https://api.dicebear.com/7.x/shapes/svg?seed=' ~ (item.title | urlencode) }}" width="44" height="44" />
-      <div style="flex:1">
-        <div class="flex items-center gap-8">
-          <div style="font-weight:700">{{ item.title }}</div>
-          {% if item.conversation.kind == "band" %}<span class="badge badge-muted">{{ t('chat.band_chat_label') }}</span>{% endif %}
-        </div>
-        <div class="text-muted" style="font-size:13px">
-          {% if item.last_message %}
-            {{ item.last_message.sender.username }}: {{ item.last_message.body[:60] }}
-          {% else %}
-            {{ t('chat.no_messages_yet') }}
-          {% endif %}
-        </div>
-      </div>
-    </a>
-    {% else %}
-    <p class="text-muted" style="padding:16px">{{ t('chat.empty_inbox') }}</p>
-    {% endfor %}
-  </div>
+<div class="container section section-with-header-buttons" style="max-width:640px">
+  <div class="card" id="chatInboxList" style="padding:0"></div>
 </div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  const chatBandLabel = {{ t('chat.band_chat_label') | tojson }};
+  const chatNoMessages = {{ t('chat.no_messages_yet') | tojson }};
+
+  initInfiniteList({
+    container: document.getElementById("chatInboxList"),
+    emptyMessage: {{ t('chat.empty_inbox') | tojson }},
+    fetchPage: (offset, limit) => fetch(`/api/chat/inbox?offset=${offset}&limit=${limit}`).then((r) => (r.ok ? r.json() : [])),
+    renderItem: (item) => {
+      const link = document.createElement("a");
+      link.href = `/chat/${item.conversation_id}`;
+      link.className = "flex items-center gap-12";
+      link.style.padding = "16px";
+      link.style.borderBottom = "1px solid var(--border)";
+
+      const avatarSrc = item.avatar_url || `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(item.title)}`;
+      const previewText = item.last_message_body
+        ? `${escapeHtml(item.last_message_sender)}: ${escapeHtml(item.last_message_body)}`
+        : escapeHtml(chatNoMessages);
+
+      link.innerHTML = `
+        <img class="avatar" src="${escapeHtml(avatarSrc)}" width="44" height="44" />
+        <div style="flex:1">
+          <div class="flex items-center gap-8">
+            <div style="font-weight:700">${escapeHtml(item.title)}</div>
+            ${item.is_band ? `<span class="badge badge-muted">${escapeHtml(chatBandLabel)}</span>` : ""}
+          </div>
+          <div class="text-muted" style="font-size:13px">${previewText}</div>
+        </div>
+      `;
+      return link;
+    },
+  });
+</script>
 {% endblock %}

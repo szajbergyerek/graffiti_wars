@@ -103,8 +103,23 @@ _COUNTRY_DATA = [
     ("NZ", "Új-Zéland", "New Zealand"),
 ]
 
+def flag_icon_url(country_code: str) -> str:
+    """
+    Build a small flag icon image URL for a country code.
+
+    Flag emoji render unreliably across platforms (Windows in particular
+    often has no color-emoji font for regional-indicator sequences, showing
+    the raw two-letter code instead), so the UI uses an actual SVG icon.
+
+    param country_code: A two-letter ISO 3166-1 alpha-2 code.
+
+    :return: A CDN URL for that country's flag icon.
+    """
+    return f"https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/flags/4x3/{country_code.lower()}.svg"
+
+
 COUNTRIES = [
-    {"code": code, "hu": name_hu, "en": name_en, "flag": flag_emoji(code)}
+    {"code": code, "hu": name_hu, "en": name_en, "flag": flag_emoji(code), "flag_icon": flag_icon_url(code)}
     for code, name_hu, name_en in sorted(_COUNTRY_DATA, key=lambda row: row[1])
 ]
 

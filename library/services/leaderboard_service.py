@@ -3,6 +3,7 @@ import math
 from typing import List
 
 from shapely.geometry import shape
+from sqlalchemy.orm import joinedload, selectinload
 
 from library.models.band import Band
 from library.models.band_territory import BandTerritory
@@ -19,13 +20,16 @@ class LeaderboardService:
     national or local ranking, since there is no location to test it against.
     """
 
+    def _base_query(self):
+        return BandTerritory.query.options(joinedload(BandTerritory.band).selectinload(Band.members))
+
     def global_ranking(self) -> List[BandTerritory]:
         """
         Rank every band by territory size, largest first.
 
         :return: BandTerritory rows sorted by area descending.
         """
-        return BandTerritory.query.order_by(BandTerritory.area_km2.desc()).all()
+        return self._base_query().order_by(BandTerritory.area_km2.desc()).all()
 
     def national_ranking(self, nationality_code: str) -> List[BandTerritory]:
         """
@@ -36,7 +40,8 @@ class LeaderboardService:
         :return: Matching BandTerritory rows sorted by area descending.
         """
         return (
-            BandTerritory.query.join(Band, BandTerritory.band_id == Band.id)
+            self._base_query()
+            .join(Band, BandTerritory.band_id == Band.id)
             .filter(Band.nationality_code == nationality_code)
             .order_by(BandTerritory.area_km2.desc())
             .all()
@@ -53,7 +58,7 @@ class LeaderboardService:
         :return: Matching BandTerritory rows sorted by area descending.
         """
         nearby = []
-        for territory in BandTerritory.query.all():
+        for territory in self._base_query().all():
             centroid = shape(json.loads(territory.geojson)).centroid
             if self._haversine_km(lat, lon, centroid.y, centroid.x) <= radius_km:
                 nearby.append(territory)

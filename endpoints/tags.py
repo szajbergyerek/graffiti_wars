@@ -4,10 +4,13 @@ from datetime import datetime
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 
 from library.extensions import db
 from library.models.image import Image
 from library.models.news_feed_event import NewsFeedEvent
+from library.models.tag_comment import TagComment
+from library.models.tag_like import TagLike
 from library.models.tag_point import TagPoint
 from library.models.tag_report import TagReport
 from library.services.exif_extractor import ExifExtractor
@@ -78,7 +81,7 @@ def submit_tag():
         images_root = current_app.config["IMAGES_ROOT"]
         storage = ImageStorage(images_root)
         try:
-            image = storage.save(photo, "tags", uploaded_by_id=current_user.id)
+            image = storage.save(photo, "tags", uploaded_by_id=current_user.id, subfolder=str(current_user.band_id))
         except ValueError:
             flash(t("flash.unsupported_image"), "error")
             return render_template("tag_submit_upload.html")
@@ -199,6 +202,92 @@ def finalize():
     db.session.commit()
 
     return jsonify({"redirect_url": url_for("tags.map_view")})
+
+
+@bp_tags.route("/tags/<int:tag_id>")
+def tag_detail(tag_id: int):
+    tag_point = TagPoint.query.options(
+        joinedload(TagPoint.submitted_by), joinedload(TagPoint.band), joinedload(TagPoint.photo_image)
+    ).get_or_404(tag_id)
+    area_added_km2 = tag_point.area_added_km2 or 0.0
+    like_count = TagLike.query.filter_by(tag_point_id=tag_id).count()
+    is_liked_by_me = (
+        current_user.is_authenticated
+        and TagLike.query.filter_by(tag_point_id=tag_id, user_id=current_user.id).first() is not None
+    )
+    return render_template(
+        "tag_detail.html",
+        tag_point=tag_point,
+        area_added_km2=area_added_km2,
+        like_count=like_count,
+        is_liked_by_me=is_liked_by_me,
+    )
+
+
+@bp_tags.route("/tags/<int:tag_id>/like", methods=["POST"])
+@login_required
+def toggle_like(tag_id: int):
+    TagPoint.query.get_or_404(tag_id)
+    existing = TagLike.query.filter_by(tag_point_id=tag_id, user_id=current_user.id).first()
+    if existing is not None:
+        db.session.delete(existing)
+        liked = False
+    else:
+        db.session.add(TagLike(tag_point_id=tag_id, user_id=current_user.id))
+        liked = True
+    db.session.commit()
+
+    like_count = TagLike.query.filter_by(tag_point_id=tag_id).count()
+    return jsonify({"liked": liked, "like_count": like_count})
+
+
+@bp_tags.route("/api/tags/<int:tag_id>/comments")
+def list_comments(tag_id: int):
+    offset = request.args.get("offset", type=int, default=0)
+    limit = min(request.args.get("limit", type=int, default=10), 50)
+    comments = (
+        TagComment.query.filter_by(tag_point_id=tag_id)
+        .options(joinedload(TagComment.user))
+        .order_by(TagComment.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return jsonify(
+        [
+            {
+                "id": c.id,
+                "username": c.user.username,
+                "avatar_url": c.user.display_avatar_url,
+                "body": c.body,
+                "created_at": c.created_at.strftime("%Y.%m.%d %H:%M"),
+            }
+            for c in comments
+        ]
+    )
+
+
+@bp_tags.route("/tags/<int:tag_id>/comments", methods=["POST"])
+@login_required
+def post_comment(tag_id: int):
+    TagPoint.query.get_or_404(tag_id)
+    body = request.form.get("body", "").strip()[:1000]
+    if not body:
+        return jsonify({"error": "empty_body"}), 400
+
+    comment = TagComment(tag_point_id=tag_id, user_id=current_user.id, body=body)
+    db.session.add(comment)
+    db.session.commit()
+
+    return jsonify(
+        {
+            "id": comment.id,
+            "username": current_user.username,
+            "avatar_url": current_user.display_avatar_url,
+            "body": comment.body,
+            "created_at": comment.created_at.strftime("%Y.%m.%d %H:%M"),
+        }
+    )
 
 
 @bp_tags.route("/tags/<int:tag_id>/report", methods=["POST"])

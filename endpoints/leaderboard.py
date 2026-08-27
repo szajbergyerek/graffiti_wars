@@ -32,6 +32,10 @@ def leaderboard_api():
     else:
         territories = leaderboard_service.global_ranking()
 
+    offset = request.args.get("offset", type=int, default=0)
+    limit = min(request.args.get("limit", type=int, default=10), 50)
+    page = territories[offset : offset + limit]
+
     return jsonify(
         [
             {
@@ -41,6 +45,6 @@ def leaderboard_api():
                 "area_km2": round(territory.area_km2, 3),
                 "member_count": len(territory.band.members),
             }
-            for territory in territories
+            for territory in page
         ]
     )

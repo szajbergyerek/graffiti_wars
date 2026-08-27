@@ -1,13 +1,23 @@
 {% extends "base.html" %}
 {% block title %}{{ t('title.tag_submit') }} - Graffiti Wars{% endblock %}
+{% block header_nav %}
+<a href="{{ url_for('tags.map_view') }}" class="app-header-back">
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+</a>
+{% endblock %}
+{% block header_title %}{{ t('title.tag_submit') }}{% endblock %}
+{% block tab_bar %}{% endblock %}
 {% block content %}
-<div class="container section" style="max-width:520px">
-  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('tag.submit_title', band=current_user.band.name) }}</h1>
-
+<div class="container section section-with-header-buttons" style="max-width:520px">
   <form method="POST" enctype="multipart/form-data" class="card" id="uploadForm">
     <div class="field mb-24">
       <label>{{ t('tag.field_photo') }}</label>
-      <input type="file" name="photo" accept="image/*" capture="environment" required />
+      <label class="dropzone" for="tagPhotoInput">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <div class="dropzone-text">{{ t('tag.field_photo') }}</div>
+        <div class="dropzone-filename"></div>
+      </label>
+      <input type="file" id="tagPhotoInput" name="photo" accept="image/*" capture="environment" required class="sr-only" />
       <p style="font-size:12px; margin-top:6px">{{ t('tag.upload_help') }}</p>
     </div>
     <input type="hidden" name="client_now" id="clientNow" />

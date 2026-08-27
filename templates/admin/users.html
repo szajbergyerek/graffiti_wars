@@ -1,40 +1,60 @@
 {% extends "base.html" %}
 {% block title %}{{ t('title.admin_users') }} - Graffiti Wars{% endblock %}
+{% block header_nav %}
+<a href="{{ url_for('profile.my_profile') }}" class="app-header-back">
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+</a>
+{% endblock %}
+{% block header_title %}{{ t('nav.admin') }}{% endblock %}
+{% block tab_bar %}{% endblock %}
 {% block content %}
-<div class="container section">
-  <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-32">{{ t('admin.users_title') }}</h1>
-
+<div class="container section section-with-header-buttons">
   <div class="flex gap-16 mb-16">
     <a href="{{ url_for('admin.queue') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_queue') }}</a>
-    <a href="{{ url_for('admin.users') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_users') }}</a>
+    <a href="{{ url_for('admin.users') }}" class="btn btn-sm btn-primary">{{ t('admin.nav_users') }}</a>
     <a href="{{ url_for('admin.bands') }}" class="btn btn-secondary btn-sm">{{ t('admin.nav_bands') }}</a>
   </div>
 
   <div class="card" style="padding:0">
     <table>
       <thead><tr><th>{{ t('admin.table_name') }}</th><th>{{ t('admin.table_email') }}</th><th>{{ t('admin.table_band') }}</th><th>{{ t('admin.table_registered') }}</th><th>{{ t('admin.table_status') }}</th><th>{{ t('admin.table_action') }}</th></tr></thead>
-      <tbody>
-        {% for user in users %}
-        <tr>
-          <td>{{ user.username }}</td>
-          <td>{{ user.email }}</td>
-          <td>{{ user.band.name if user.band else t('admin.civilian_label') }}</td>
-          <td>{{ user.created_at.strftime("%Y.%m.%d") }}</td>
-          <td>
-            {% if user.is_admin %}<span class="badge badge-purple">{{ t('profile.admin_badge') }}</span>{% endif %}
-            {% if user.is_banned %}<span class="badge badge-danger">{{ t('admin.banned_badge') }}</span>{% endif %}
-          </td>
-          <td>
-            <form method="POST" action="{{ url_for('admin.toggle_ban', user_id=user.id) }}">
-              <button class="btn btn-sm {{ 'btn-success' if user.is_banned else 'btn-danger' }}">
-                {{ t('admin.unban') if user.is_banned else t('admin.ban') }}
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
+      <tbody id="usersTableBody"></tbody>
     </table>
   </div>
 </div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  const usersCivilianLabel = {{ t('admin.civilian_label') | tojson }};
+  const usersAdminBadgeLabel = {{ t('profile.admin_badge') | tojson }};
+  const usersBannedBadgeLabel = {{ t('admin.banned_badge') | tojson }};
+  const usersUnbanLabel = {{ t('admin.unban') | tojson }};
+  const usersBanLabel = {{ t('admin.ban') | tojson }};
+
+  initInfiniteList({
+    container: document.getElementById("usersTableBody"),
+    fetchPage: (offset, limit) => fetch(`/admin/api/users?offset=${offset}&limit=${limit}`).then((r) => (r.ok ? r.json() : [])),
+    renderItem: (user) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${escapeHtml(user.username)}</td>
+        <td>${escapeHtml(user.email)}</td>
+        <td>${escapeHtml(user.band_name || usersCivilianLabel)}</td>
+        <td>${user.registered_at}</td>
+        <td>
+          ${user.is_admin ? `<span class="badge badge-purple">${escapeHtml(usersAdminBadgeLabel)}</span>` : ""}
+          ${user.is_banned ? `<span class="badge badge-danger">${escapeHtml(usersBannedBadgeLabel)}</span>` : ""}
+        </td>
+        <td>
+          <form method="POST" action="/admin/users/${user.user_id}/toggle-ban">
+            <button class="btn btn-sm ${user.is_banned ? "btn-success" : "btn-danger"}">
+              ${escapeHtml(user.is_banned ? usersUnbanLabel : usersBanLabel)}
+            </button>
+          </form>
+        </td>
+      `;
+      return row;
+    },
+  });
+</script>
 {% endblock %}

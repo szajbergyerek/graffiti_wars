@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% block title %}{{ t('title.band_create') }} - Graffiti Wars{% endblock %}
+{% block header_nav %}
+<a href="{{ url_for('bands.list_bands') }}" class="app-header-back">
+  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+</a>
+{% endblock %}
+{% block header_title %}{{ t('band.create_title') }}{% endblock %}
+{% block tab_bar %}{% endblock %}
 {% block content %}
-<div class="container section" style="max-width:560px">
+<div class="container section section-with-header-buttons" style="max-width:560px">
   <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('band.create_title') }}</h1>
   <form method="POST" enctype="multipart/form-data" class="card">
     <div class="field">
@@ -14,8 +21,35 @@
     </div>
     <div class="field">
       <label>{{ t('band.field_reference_image') }}</label>
-      <input type="file" name="reference_image" accept="image/*" required />
+      <label class="dropzone" for="referenceImageInput">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        <div class="dropzone-text">{{ t('band.field_reference_image') }}</div>
+        <div class="dropzone-filename"></div>
+      </label>
+      <input type="file" id="referenceImageInput" name="reference_image" accept="image/*" required class="sr-only" />
       <p style="font-size:12px; margin-top:6px">{{ t('band.reference_help') }}</p>
+    </div>
+    <div class="field">
+      <label>{{ t('band.field_color') }}</label>
+      <div class="color-swatch-picker">
+        {% for color in colors %}
+        <label class="color-swatch" style="background:{{ color }}">
+          <input type="radio" name="color" value="{{ color }}" {{ "checked" if loop.first else "" }} />
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="field">
+      <label>{{ t('band.field_nationality') }}</label>
+      <div class="flex items-center gap-8">
+        <span id="createNationalityFlag" style="font-size:22px; width:28px; flex-shrink:0; text-align:center"></span>
+        <select name="nationality_code" id="createNationalitySelect" style="flex:1">
+          <option value="" data-flag-icon="">{{ t('band.nationality_none') }}</option>
+          {% for country in countries %}
+          <option value="{{ country.code }}" data-flag-icon="{{ country.flag_icon }}">{{ country.hu if g.locale == "hu" else country.en }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
     <div class="field mb-24">
       <label>{{ t('band.field_join_policy') }}</label>
@@ -35,4 +69,9 @@
     <button type="submit" class="btn btn-primary btn-block">{{ t('band.create_submit') }}</button>
   </form>
 </div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  initNationalityPreview("createNationalitySelect", "createNationalityFlag");
+</script>
 {% endblock %}

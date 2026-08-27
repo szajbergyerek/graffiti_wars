@@ -1,26 +1,20 @@
 {% extends "base.html" %}
 {% block title %}{{ t('title.leaderboard') }} - Graffiti Wars{% endblock %}
+{% block header_title %}{{ t('title.leaderboard') }}{% endblock %}
 {% block extra_head %}
 <style>
-  .lb-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
-  .lb-tab {
-    padding: 10px 18px; border-radius: var(--radius-sm); font-weight: 700; font-size: 14px;
-    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer;
-  }
-  .lb-tab.active { background: linear-gradient(135deg, var(--pink), var(--purple)); color: #fff; border-color: transparent; }
   .lb-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .lb-row-mine { background: rgba(255, 46, 108, 0.1); border-left: 3px solid var(--pink); padding-left: 13px; }
   .lb-row:last-child { border-bottom: none; }
   .lb-rank { font-family: var(--font-display); font-size: 18px; width: 28px; color: var(--text-faint); }
 </style>
 {% endblock %}
 {% block content %}
 <div class="container section" style="max-width:640px">
-  <h1 style="font-size:28px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('title.leaderboard') }}</h1>
-
-  <div class="lb-tabs">
-    <div class="lb-tab active" data-scope="global">{{ t('leaderboard.tab_global') }}</div>
-    <div class="lb-tab" data-scope="national">{{ t('leaderboard.tab_national') }}</div>
-    <div class="lb-tab" data-scope="local">{{ t('leaderboard.tab_local') }}</div>
+  <div class="segmented mb-24">
+    <div class="segmented-item active" data-scope="global">{{ t('leaderboard.tab_global') }}</div>
+    <div class="segmented-item" data-scope="national">{{ t('leaderboard.tab_national') }}</div>
+    <div class="segmented-item" data-scope="local">{{ t('leaderboard.tab_local') }}</div>
   </div>
 
   <div class="card" id="leaderboardResults" style="padding:0"></div>
@@ -35,79 +29,91 @@
     locationDenied: {{ t('leaderboard.location_denied') | tojson }},
   };
 
+  const leaderboardContainer = document.getElementById("leaderboardResults");
+  const myBandId = {{ current_user.band_id | tojson if current_user.is_authenticated else "null" }};
+  let lbRank = 0;
+  let lbActiveList = null;
+
   function lbShowMessage(text) {
-    const container = document.getElementById("leaderboardResults");
-    container.innerHTML = "";
+    if (lbActiveList) {
+      lbActiveList.destroy();
+      lbActiveList = null;
+    }
+    leaderboardContainer.innerHTML = "";
     const p = document.createElement("p");
     p.className = "text-muted";
     p.style.padding = "16px";
     p.textContent = text;
-    container.appendChild(p);
+    leaderboardContainer.appendChild(p);
   }
 
-  function lbRenderResults(items) {
-    const container = document.getElementById("leaderboardResults");
-    container.innerHTML = "";
-    if (!items.length) {
-      lbShowMessage(lbMessages.empty);
-      return;
-    }
-    items.forEach((item, index) => {
-      const row = document.createElement("div");
-      row.className = "lb-row";
+  function lbRenderRow(item) {
+    lbRank += 1;
+    const row = document.createElement("div");
+    row.className = "lb-row" + (myBandId && item.band_id === myBandId ? " lb-row-mine" : "");
 
-      const rank = document.createElement("div");
-      rank.className = "lb-rank";
-      rank.textContent = index + 1;
+    const rank = document.createElement("div");
+    rank.className = "lb-rank";
+    rank.textContent = lbRank;
 
-      const swatch = document.createElement("div");
-      swatch.style.width = "36px";
-      swatch.style.height = "36px";
-      swatch.style.borderRadius = "8px";
-      swatch.style.background = item.color;
-      swatch.style.flexShrink = "0";
+    const swatch = document.createElement("div");
+    swatch.style.width = "36px";
+    swatch.style.height = "36px";
+    swatch.style.borderRadius = "8px";
+    swatch.style.background = item.color;
+    swatch.style.flexShrink = "0";
 
-      const info = document.createElement("div");
-      info.style.flex = "1";
-      const link = document.createElement("a");
-      link.href = `/bands/${item.band_id}`;
-      link.style.fontWeight = "700";
-      link.textContent = item.band_name;
-      const memberLine = document.createElement("div");
-      memberLine.className = "text-muted";
-      memberLine.style.fontSize = "13px";
-      memberLine.textContent = `${item.member_count} tag`;
-      info.appendChild(link);
-      info.appendChild(memberLine);
+    const info = document.createElement("div");
+    info.style.flex = "1";
+    const link = document.createElement("a");
+    link.href = `/bands/${item.band_id}`;
+    link.style.fontWeight = "700";
+    link.textContent = item.band_name;
+    const memberLine = document.createElement("div");
+    memberLine.className = "text-muted";
+    memberLine.style.fontSize = "13px";
+    memberLine.textContent = `${item.member_count} tag`;
+    info.appendChild(link);
+    info.appendChild(memberLine);
 
-      const area = document.createElement("div");
-      area.className = "badge";
-      area.style.background = `${item.color}22`;
-      area.style.color = item.color;
-      area.textContent = `${item.area_km2.toFixed(2)} km2`;
+    const area = document.createElement("div");
+    area.className = "badge";
+    area.style.background = `${item.color}22`;
+    area.style.color = item.color;
+    area.textContent = `${item.area_km2.toFixed(2)} km2`;
 
-      row.appendChild(rank);
-      row.appendChild(swatch);
-      row.appendChild(info);
-      row.appendChild(area);
-      container.appendChild(row);
+    row.appendChild(rank);
+    row.appendChild(swatch);
+    row.appendChild(info);
+    row.appendChild(area);
+    return row;
+  }
+
+  function lbStartInfiniteList(extraParams) {
+    if (lbActiveList) lbActiveList.destroy();
+    lbRank = 0;
+    lbActiveList = initInfiniteList({
+      container: leaderboardContainer,
+      emptyMessage: lbMessages.empty,
+      pageSize: 10,
+      fetchPage: (offset, limit) =>
+        fetch(`/api/leaderboard?${extraParams}&offset=${offset}&limit=${limit}`).then((r) => (r.ok ? r.json() : [])),
+      renderItem: lbRenderRow,
     });
   }
 
   function lbLoadScope(scope) {
-    document.querySelectorAll(".lb-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.scope === scope));
+    document.querySelectorAll(".segmented-item").forEach((tab) => tab.classList.toggle("active", tab.dataset.scope === scope));
 
     if (scope === "global") {
-      fetch("/api/leaderboard?scope=global").then((r) => r.json()).then(lbRenderResults);
+      lbStartInfiniteList("scope=global");
     } else if (scope === "national") {
-      fetch("/api/leaderboard?scope=national").then((r) => {
+      fetch("/api/leaderboard?scope=national&limit=1").then((r) => {
         if (r.status === 400) {
           lbShowMessage(lbMessages.noNationality);
-          return null;
+          return;
         }
-        return r.json();
-      }).then((data) => {
-        if (data) lbRenderResults(data);
+        lbStartInfiniteList("scope=national");
       });
     } else if (scope === "local") {
       lbShowMessage(lbMessages.requestingLocation);
@@ -117,16 +123,14 @@
       }
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          fetch(`/api/leaderboard?scope=local&lat=${position.coords.latitude}&lon=${position.coords.longitude}`)
-            .then((r) => r.json())
-            .then(lbRenderResults);
+          lbStartInfiniteList(`scope=local&lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
         },
         () => lbShowMessage(lbMessages.locationDenied)
       );
     }
   }
 
-  document.querySelectorAll(".lb-tab").forEach((tab) => {
+  document.querySelectorAll(".segmented-item").forEach((tab) => {
     tab.addEventListener("click", () => lbLoadScope(tab.dataset.scope));
   });
 

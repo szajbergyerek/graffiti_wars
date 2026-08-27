@@ -2,7 +2,7 @@
 <html lang="{{ g.locale }}">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>{% block title %}Graffiti Wars{% endblock %}</title>
 <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -10,48 +10,20 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="app-shell">
 
-<nav class="navbar">
-  <a class="logo" href="{{ url_for('index.index') }}"><span>GRAFFITI</span><span class="dot">WARS</span></a>
-  <button type="button" class="nav-toggle" id="navToggle" aria-label="Menu">
-    <span></span><span></span><span></span>
-  </button>
-  <div class="navbar-links" id="navLinks">
-    <a href="{{ url_for('tags.map_view') }}" class="{{ 'active' if request.endpoint == 'tags.map_view' else '' }}">{{ t('nav.map') }}</a>
-    <a href="{{ url_for('bands.list_bands') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('bands.') else '' }}">{{ t('nav.bands') }}</a>
-    <a href="{{ url_for('feed.feed') }}" class="{{ 'active' if request.endpoint == 'feed.feed' else '' }}">{{ t('nav.feed') }}</a>
-    <a href="{{ url_for('leaderboard.leaderboard_page') }}" class="{{ 'active' if request.endpoint == 'leaderboard.leaderboard_page' else '' }}">{{ t('title.leaderboard') }}</a>
-    {% if current_user.is_authenticated %}
-    <a href="{{ url_for('profile.my_profile') }}" class="{{ 'active' if request.endpoint == 'profile.my_profile' else '' }}">{{ t('nav.profile') }}</a>
-    <a href="{{ url_for('chat.inbox') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('chat.') else '' }}">{{ t('nav.chat') }}</a>
-    {% if current_user.is_admin %}<a href="{{ url_for('admin.queue') }}">{{ t('nav.admin') }}</a>{% endif %}
-    {% endif %}
-    <div class="navbar-links-mobile-actions">
-      {% if current_user.is_authenticated %}
-        {% if current_user.is_civilian %}
-          <a href="{{ url_for('bands.create_band') }}" class="btn btn-secondary btn-sm">{{ t('nav.create_band') }}</a>
-        {% endif %}
-        <a href="{{ url_for('auth.logout') }}" class="btn btn-ghost btn-sm">{{ t('nav.logout') }}</a>
-      {% else %}
-        <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm">{{ t('nav.login') }}</a>
-      {% endif %}
-    </div>
-  </div>
-  <div class="navbar-actions">
-    {% if current_user.is_authenticated %}
-      {% if current_user.is_civilian %}
-        <a href="{{ url_for('bands.create_band') }}" class="btn btn-secondary btn-sm">{{ t('nav.create_band') }}</a>
-      {% endif %}
-      <a href="{{ url_for('profile.my_profile') }}">
-        <img class="avatar" src="{{ current_user.display_avatar_url }}" width="34" height="34" alt="avatar" />
-      </a>
-      <a href="{{ url_for('auth.logout') }}" class="btn btn-ghost btn-sm">{{ t('nav.logout') }}</a>
-    {% else %}
-      <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm">{{ t('nav.login') }}</a>
-    {% endif %}
-  </div>
-</nav>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="tabActiveGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff2e6c" />
+      <stop offset="50%" stop-color="#8c52ff" />
+      <stop offset="100%" stop-color="#00e0d1" />
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="header-back-slot">{% block header_nav %}{% endblock %}</div>
+<div class="header-action-slot">{% block header_action %}{% endblock %}</div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
@@ -63,20 +35,48 @@
   {% endif %}
 {% endwith %}
 
-<main>
+<main class="app-content">
 {% block content %}{% endblock %}
 </main>
 
-{% if current_user.is_authenticated and not current_user.is_civilian %}
-<a href="{{ url_for('tags.submit_tag') }}" class="btn btn-primary fab">{{ t('map.submit_tag_button') }}</a>
+{% set hide_fab_on = ['tags.submit_tag', 'tags.locate', 'tags.processing', 'bands.create_band', 'chat.conversation_view', 'profile.edit_profile', 'bands.band_detail', 'tags.tag_detail', 'profile.my_profile', 'profile.user_profile'] %}
+{% set fab_hidden = request.endpoint in hide_fab_on %}
+{% if current_user.is_authenticated and not fab_hidden %}
+  {% if current_user.is_civilian %}
+  <a href="{{ url_for('bands.create_band') }}" class="fab" aria-label="{{ t('nav.create_band') }}">
+    <svg viewBox="0 0 24 24" width="26" height="26" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><path d="M5 4h13l-3 4 3 4H5Z"/></svg>
+  </a>
+  {% else %}
+  <a href="{{ url_for('tags.submit_tag') }}" class="fab" aria-label="{{ t('map.submit_tag_button') }}">
+    <svg viewBox="0 0 24 24" width="26" height="26" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+  </a>
+  {% endif %}
 {% endif %}
 
-<footer>
-  <div class="container">
-    <a class="logo" href="{{ url_for('index.index') }}" style="font-size:16px"><span>GRAFFITI</span><span class="dot">WARS</span></a>
-    <p>{{ t('footer.rights') }}</p>
-  </div>
-</footer>
+{% block tab_bar %}
+{% set profile_active = request.endpoint and (request.endpoint.startswith('profile.') or request.endpoint.startswith('chat.') or request.endpoint.startswith('admin.') or request.endpoint == 'feed.feed' or request.endpoint == 'auth.logout') %}
+<nav class="tab-bar">
+  <a href="{{ url_for('tags.map_view') }}" class="tab-bar-item {{ 'active' if request.endpoint == 'tags.map_view' else '' }}">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.58 7-12A7 7 0 0 0 5 9c0 4.42 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+    <span>{{ t('nav.map') }}</span>
+  </a>
+  <a href="{{ url_for('bands.list_bands') }}" class="tab-bar-item {{ 'active' if request.endpoint and request.endpoint.startswith('bands.') else '' }}">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><path d="M5 4h13l-3 4 3 4H5Z"/></svg>
+    <span>{{ t('nav.bands') }}</span>
+  </a>
+  <div class="tab-bar-spacer" aria-hidden="true"></div>
+  <a href="{{ url_for('leaderboard.leaderboard_page') }}" class="tab-bar-item {{ 'active' if request.endpoint == 'leaderboard.leaderboard_page' else '' }}">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a3 3 0 0 0 3 4"/><path d="M17 5h3a3 3 0 0 1-3 4"/></svg>
+    <span>{{ t('title.leaderboard') }}</span>
+  </a>
+  <a href="{{ url_for('profile.my_profile') }}" class="tab-bar-item {{ 'active' if profile_active else '' }}" style="position:relative">
+    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+    {% set unread = unread_chat_count() %}
+    <span class="unread-badge" id="unreadBadge" style="{{ '' if unread > 0 else 'display:none' }}">{{ unread }}</span>
+    <span>{{ t('nav.profile') }}</span>
+  </a>
+</nav>
+{% endblock %}
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 {% block extra_scripts %}{% endblock %}

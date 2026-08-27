@@ -21,13 +21,15 @@ class ImageStorage:
     def __init__(self, images_root: str) -> None:
         self.images_root = images_root
 
-    def save(self, file: UploadedFile, category: str, uploaded_by_id: int = None) -> Image:
+    def save(self, file: UploadedFile, category: str, uploaded_by_id: int = None, subfolder: str = None) -> Image:
         """
-        Persist an uploaded file under `images_root/category/<hash>.<ext>`.
+        Persist an uploaded file under `images_root/category/<hash>.<ext>`, or
+        `images_root/category/<subfolder>/<hash>.<ext>` when a subfolder is given.
 
         param file: The uploaded file object from a Flask request.
         param category: Which image category this belongs to ("avatars", "banners", or "tags").
         param uploaded_by_id: The id of the user who uploaded it, for provenance.
+        param subfolder: An optional extra path segment to nest this file under (e.g. a band id).
 
         :return: The `Image` row for this file (newly created, or the existing one if identical content was seen before).
         """
@@ -37,13 +39,14 @@ class ImageStorage:
 
         data = file.read()
         file_hash = hashlib.sha256(data).hexdigest()
-        relative_path = f"{category}/{file_hash}.{extension}"
+        category_path = f"{category}/{subfolder}" if subfolder else category
+        relative_path = f"{category_path}/{file_hash}.{extension}"
 
         existing = Image.query.filter_by(relative_path=relative_path).first()
         if existing is not None:
             return existing
 
-        target_dir = os.path.join(self.images_root, category)
+        target_dir = os.path.join(self.images_root, category_path)
         os.makedirs(target_dir, exist_ok=True)
         with open(os.path.join(target_dir, f"{file_hash}.{extension}"), "wb") as target_file:
             target_file.write(data)

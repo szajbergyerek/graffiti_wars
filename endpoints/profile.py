@@ -37,8 +37,9 @@ def _build_profile_context(user: User) -> dict:
 
 
 @bp_profile.route("/profile")
-@login_required
 def my_profile():
+    if not current_user.is_authenticated:
+        return render_template("profile.html", is_own_profile=True)
     return render_template("profile.html", is_own_profile=True, **_build_profile_context(current_user))
 
 

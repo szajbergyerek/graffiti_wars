@@ -52,38 +52,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": 'TAG THE CITY.<br/><span class="accent">CLAIM</span> THE <span class="accent2">TERRITORY.</span>',
     },
     "home.lead": {
-        "hu": "Hozz létre bandát, jelöld meg a tageteket a térképen, és szerezz területet minden hitelesített falfestéssel. Valós helyszínek, AI-hitelesítés, élő verseny.",
-        "en": "Form a gang, mark your tags on the map, and claim territory with every verified piece. Real locations, AI verification, live competition.",
+        "hu": "Hozz létre bandát, jelöld meg a tageteket a térképen, és szerezz területet minden felfestett munkával. Valós helyszínek, élő verseny.",
+        "en": "Form a gang, mark your tags on the map, and claim territory with every piece you paint. Real locations, live competition.",
     },
     "home.cta_join": {"hu": "Csatlakozom", "en": "Join now"},
     "home.cta_open_map": {"hu": "Térkép megnyitása", "en": "Open the map"},
     "home.cta_view_map": {"hu": "Élő térkép megtekintése", "en": "View the live map"},
     "home.stat_bands": {"hu": "Aktív banda", "en": "Active gangs"},
     "home.stat_area": {"hu": "Lefedett terület", "en": "Territory covered"},
-    "home.stat_tags": {"hu": "Hitelesített tag", "en": "Verified tags"},
+    "home.stat_tags": {"hu": "Tagek", "en": "Tags"},
     "home.stat_users": {"hu": "Regisztrált játékos", "en": "Registered players"},
-    "home.how_title": {"hu": "Hogyan működik?", "en": "How it works"},
-    "home.how_sub": {"hu": "Négy lépésben szerezhetsz területet a bandádnak.", "en": "Four steps to claim territory for your gang."},
-    "home.step1_title": {"hu": "Alakíts bandát", "en": "Form a gang"},
-    "home.step1_desc": {
-        "hu": "Nevezd el, tölts fel egy referencia tag-képet - ez lesz a banda hiteles alapja.",
-        "en": "Name it, upload a reference tag photo - this becomes the gang's verified baseline.",
-    },
-    "home.step2_title": {"hu": "Fesd fel a tagedet", "en": "Paint your tag"},
-    "home.step2_desc": {
-        "hu": "Menj ki a helyszínre, készíts fotót a friss munkáról és add meg a lokációt.",
-        "en": "Go to the spot, photograph the fresh piece, and set its location.",
-    },
-    "home.step3_title": {"hu": "AI hitelesítés", "en": "AI verification"},
-    "home.step3_desc": {
-        "hu": "A rendszer összeveti a fotót a banda regisztrált tagjével, és jóváhagyja a pontot.",
-        "en": "The system compares the photo to the gang's registered tag and approves the point.",
-    },
-    "home.step4_title": {"hu": "Terület a tiéd", "en": "The territory is yours"},
-    "home.step4_desc": {
-        "hu": "A hitelesített pontok körül kiterjed a banda területe a térképen.",
-        "en": "Your gang's territory expands on the map around every verified point.",
-    },
     "home.map_title": {"hu": "Élő térkép", "en": "Live map"},
     "home.map_sub": {
         "hu": "Nézd meg élőben, mely bandák uralják jelenleg a várost.",
@@ -128,9 +106,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "band.field_description": {"hu": "Leírás (opcionális)", "en": "Description (optional)"},
     "band.field_reference_image": {"hu": "Referencia tag kép", "en": "Reference tag photo"},
     "band.reference_help": {
-        "hu": "Ez lesz az alap, amihez minden később beadott fotót hasonlít az AI.",
-        "en": "This becomes the baseline every future submitted photo is compared against by the AI.",
+        "hu": "Ez jelenik meg a banda arculataként a bandák listájában.",
+        "en": "This is shown as the gang's look in the gang list.",
     },
+    "band.field_color": {"hu": "Banda színe", "en": "Gang color"},
     "band.field_join_policy": {"hu": "Csatlakozás módja", "en": "How members can join"},
     "band.join_policy_open": {"hu": "Nyílt - bárki azonnal csatlakozhat", "en": "Open - anyone can join instantly"},
     "band.join_policy_request": {
@@ -156,13 +135,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "band.add_member_button": {"hu": "Hozzáadás", "en": "Add"},
     "band.stat_area": {"hu": "Lefedett terület", "en": "Territory covered"},
     "band.stat_members": {"hu": "Aktív tag", "en": "Active members"},
-    "band.stat_verified_points": {"hu": "Hitelesített tag pont", "en": "Verified tag points"},
+    "band.stat_verified_points": {"hu": "Tagek", "en": "Tags"},
     "band.stat_joining_label": {"hu": "Csatlakozás", "en": "Joining"},
     "band.map_title": {"hu": "Terület a térképen", "en": "Territory on the map"},
     "band.members_title": {"hu": "Tagok és hozzájárulás", "en": "Members and contribution"},
     "band.table_user": {"hu": "Felhasználó", "en": "User"},
     "band.table_joined": {"hu": "Csatlakozott", "en": "Joined"},
-    "band.table_verified": {"hu": "Hitelesített pontok", "en": "Verified points"},
+    "band.table_verified": {"hu": "Pontok", "en": "Points"},
     "band.table_role": {"hu": "Szerep", "en": "Role"},
     "band.role_leader": {"hu": "Vezető", "en": "Leader"},
     "band.role_member": {"hu": "Tag", "en": "Member"},
@@ -172,13 +151,14 @@ STRINGS: dict[str, dict[str, str]] = {
     "profile.member_of": {"hu": "{band} tagja - csatlakozott {date}", "en": "Member of {band} - joined {date}"},
     "profile.admin_badge": {"hu": "Admin", "en": "Admin"},
     "profile.leader_badge": {"hu": "Banda vezető", "en": "Gang leader"},
-    "profile.stat_approved": {"hu": "Elfogadott tag pont", "en": "Approved tag points"},
+    "profile.stat_approved": {"hu": "Pontok", "en": "Points"},
     "profile.stat_acceptance_rate": {"hu": "Elfogadási arány", "en": "Acceptance rate"},
     "profile.stat_contribution": {"hu": "Hozzájárulás a bandához", "en": "Contribution to gang"},
     "profile.stat_submitted": {"hu": "Összes beadvány", "en": "Total submissions"},
     "profile.recent_title": {"hu": "Legutóbbi beadványok", "en": "Recent submissions"},
     "profile.no_tags_yet": {"hu": "Még nincs beadott tag.", "en": "No tags submitted yet."},
     "profile.edit_button": {"hu": "Profil szerkesztése", "en": "Edit profile"},
+    "profile.my_gang_button": {"hu": "Bandám", "en": "My gang"},
     "profile.message_button": {"hu": "Üzenet küldése", "en": "Send message"},
     "profile.edit_title": {"hu": "Profil szerkesztése", "en": "Edit profile"},
     "profile.field_username": {"hu": "Felhasználónév", "en": "Username"},
@@ -189,12 +169,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "profile.field_nationality": {"hu": "Nemzetiség", "en": "Nationality"},
     "profile.nationality_none": {"hu": "Nincs megadva", "en": "Not set"},
     "profile.save_button": {"hu": "Mentés", "en": "Save"},
-
-    # ---------- Tag status ----------
-    "status.approved": {"hu": "jóváhagyva", "en": "approved"},
-    "status.rejected": {"hu": "elutasítva", "en": "rejected"},
-    "status.pending": {"hu": "függőben", "en": "pending"},
-    "status.removed": {"hu": "eltávolítva", "en": "removed"},
 
     # ---------- Auth flash messages ----------
     "flash.account_banned": {"hu": "Ez a fiók ki van tiltva.", "en": "This account has been banned."},
@@ -253,8 +227,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "A photo is required.",
     },
     "flash.tag_approved": {
-        "hu": "A tag hitelesítve és jóváhagyva! A terület frissült.",
-        "en": "The tag was verified and approved! The territory has been updated.",
+        "hu": "A tag felkerült a térképre! A terület frissült.",
+        "en": "The tag is on the map! The territory has been updated.",
     },
     "flash.photo_no_capture_time": {
         "hu": "A fotó nem tartalmaz készítési időpontot, nem tudjuk ellenőrizni a frissességét.",
@@ -278,7 +252,7 @@ STRINGS: dict[str, dict[str, str]] = {
     # ---------- News feed ----------
     "feed.band_created": {"hu": "Új banda alakult: {band}", "en": "A new gang has formed: {band}"},
     "feed.member_joined": {"hu": "{username} csatlakozott: {band}", "en": "{username} joined {band}"},
-    "feed.tag_approved": {"hu": "{band} új tagot hitelesített ({username})", "en": "{band} verified a new tag ({username})"},
+    "feed.tag_approved": {"hu": "{band} új tagot rakott fel ({username})", "en": "{band} added a new tag ({username})"},
 
     # ---------- Tag submission page ----------
     "tag.submit_title": {"hu": "Új tag beadása - {band}", "en": "New tag submission - {band}"},
@@ -299,7 +273,7 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "tag.accept_button": {"hu": "Elfogadás", "en": "Accept"},
     "tag.cancel_button": {"hu": "Mégse", "en": "Cancel"},
-    "tag.processing_title": {"hu": "Hitelesítés folyamatban...", "en": "Verifying..."},
+    "tag.processing_title": {"hu": "Feldolgozás...", "en": "Processing..."},
     "tag.processing_message": {
         "hu": "Az AI most ellenőrzi a taget. Ez csak néhány másodpercig tart.",
         "en": "The AI is checking your tag. This only takes a few seconds.",
@@ -308,6 +282,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "hu": "Az AI automatikusan összeveti a banda regisztrált tagjével.",
         "en": "The AI automatically compares it with the gang's registered tag.",
     },
+    "title.tag_detail": {"hu": "Tag részletei", "en": "Tag details"},
+    "tag.detail_submitted_by": {"hu": "Feltöltötte", "en": "Uploaded by"},
+    "tag.detail_band": {"hu": "Banda", "en": "Gang"},
+    "tag.detail_uploaded_at": {"hu": "Feltöltve", "en": "Uploaded at"},
+    "tag.detail_area_added": {"hu": "Ezzel hozzáadott terület", "en": "Territory added by this tag"},
+    "tag.report_button": {"hu": "Tag jelentése", "en": "Report this tag"},
+    "tag.confirm_report": {"hu": "Biztosan jelented ezt a taget?", "en": "Are you sure you want to report this tag?"},
+    "tag.report_title": {"hu": "Miért jelented ezt a taget?", "en": "Why are you reporting this tag?"},
+    "tag.report_reason_not_tag": {"hu": "Nem tag", "en": "Not a tag"},
+    "tag.report_reason_missing": {"hu": "Nincs is ott", "en": "It's not there"},
+    "tag.report_reason_cheating": {"hu": "Csalás történt", "en": "Cheating occurred"},
+    "tag.like_button": {"hu": "Tetszik", "en": "Like"},
+    "tag.comments_title": {"hu": "Hozzászólások", "en": "Comments"},
+    "tag.comment_placeholder": {"hu": "Írj hozzászólást...", "en": "Write a comment..."},
+    "tag.comment_send": {"hu": "Küldés", "en": "Post"},
+    "tag.no_comments_yet": {"hu": "Még nincs hozzászólás.", "en": "No comments yet."},
 
     # ---------- Admin panel ----------
     "admin.nav_queue": {"hu": "Várólista", "en": "Queue"},
@@ -351,6 +341,19 @@ STRINGS: dict[str, dict[str, str]] = {
     "chat.send_button": {"hu": "Küldés", "en": "Send"},
     "chat.no_messages_yet": {"hu": "Még nincs üzenet - kezdd el a beszélgetést!", "en": "No messages yet - start the conversation!"},
     "chat.back_to_inbox": {"hu": "Vissza az üzenetekhez", "en": "Back to messages"},
+    "chat.view_on_map": {"hu": "Megtekintés a térképen", "en": "View on map"},
+    "chat.attach_image": {"hu": "Kép csatolása", "en": "Attach image"},
+    "chat.share_location": {"hu": "Helyzet megosztása", "en": "Share location"},
+    "chat.create_poll": {"hu": "Szavazás indítása", "en": "Start a poll"},
+    "chat.poll_question_placeholder": {"hu": "Kérdés", "en": "Question"},
+    "chat.poll_option_placeholder": {"hu": "Opció {n}", "en": "Option {n}"},
+    "chat.poll_add_option": {"hu": "+ Opció hozzáadása", "en": "+ Add option"},
+    "chat.poll_create_button": {"hu": "Szavazás létrehozása", "en": "Create poll"},
+    "chat.poll_votes_label": {"hu": "szavazat", "en": "votes"},
+    "chat.poll_cancel": {"hu": "Mégse", "en": "Cancel"},
+    "chat.preview_image": {"hu": "\U0001F4F7 Kép", "en": "\U0001F4F7 Photo"},
+    "chat.preview_location": {"hu": "\U0001F4CD Helyzet", "en": "\U0001F4CD Location"},
+    "chat.preview_poll": {"hu": "\U0001F4CA Szavazás", "en": "\U0001F4CA Poll"},
 
     # ---------- Leaderboard page ----------
     "leaderboard.tab_global": {"hu": "Globális", "en": "Global"},
@@ -380,6 +383,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "band.confirm_kick": {"hu": "Biztosan kirúgod?", "en": "Are you sure you want to kick this member?"},
     "flash.band_settings_updated": {"hu": "Banda beállításai frissítve.", "en": "Gang settings updated."},
     "flash.member_kicked": {"hu": "{username} kirúgva a bandából.", "en": "{username} kicked from the gang."},
+    "band.disband_button": {"hu": "Banda feloszlatása", "en": "Disband the gang"},
+    "band.confirm_disband": {
+        "hu": "Biztosan feloszlatod a bandát? Ez véglegesen törli a bandát, a területét és minden tagját eltávolítja.",
+        "en": "Are you sure you want to disband the gang? This permanently deletes it, its territory, and removes all members.",
+    },
+    "flash.band_disbanded": {"hu": "A(z) {band} banda feloszlott.", "en": "{band} has been disbanded."},
     "flash.cannot_kick_self": {
         "hu": "Magadat nem tudod kirúgni - inkább lépj ki.",
         "en": "You can't kick yourself - leave instead.",
@@ -406,12 +415,13 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # ---------- Map sidebar ----------
     "map.member_ranking_title": {"hu": "Tagok ranglistája", "en": "Member ranking"},
+    "map.sidebar_toggle": {"hu": "Banda infó és toplista", "en": "Crew info & leaderboard"},
 
     # ---------- Landmarks ----------
     "band.landmarks_title": {"hu": "Területen található helyszínek", "en": "Landmarks in the territory"},
     "band.landmarks_empty": {
-        "hu": "Nincs adat - a lista az első hitelesített tag után jelenik meg.",
-        "en": "No data yet - this appears after the first verified tag.",
+        "hu": "Nincs adat - a lista az első tag után jelenik meg.",
+        "en": "No data yet - this appears after the first tag.",
     },
     "category.amenity": {"hu": "Vendéglátás és szolgáltatások", "en": "Amenities"},
     "category.shop": {"hu": "Üzletek", "en": "Shops"},
