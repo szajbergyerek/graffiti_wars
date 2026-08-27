@@ -10,3 +10,4 @@ Pillow==12.3.0
 ImageHash==4.3.2
 Authlib==1.7.2
 requests==2.34.2
+gunicorn==23.0.0

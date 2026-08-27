@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-graffiti_wars}
+      POSTGRES_USER: ${DATABASE_USER:-graffiti_wars}
+      POSTGRES_PASSWORD: ${DATABASE_PASS:?set DATABASE_PASS}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-graffiti_wars}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    # If you'd rather not have Portainer build from source, push the image to a
+    # registry (e.g. GHCR) and swap the line above for:
+    #   image: ghcr.io/<you>/graffiti-wars:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${DATABASE_NAME:-graffiti_wars}
+      DATABASE_USER: ${DATABASE_USER:-graffiti_wars}
+      DATABASE_PASS: ${DATABASE_PASS:?set DATABASE_PASS}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?set GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?set GOOGLE_CLIENT_SECRET}
+    ports:
+      - "5000:5000"
+    volumes:
+      - images_data:/app/assets/images
+
+volumes:
+  db_data:
+  images_data:

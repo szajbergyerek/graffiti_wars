@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+venv
+env
+__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+assets/images
+static/uploads
+mockup
+dev_motes.md
+PROJECT_MEMORY.md
+README.md
