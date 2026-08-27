@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ${DATABASE_USER:-graffiti_wars}
       POSTGRES_PASSWORD: ${DATABASE_PASS:?set DATABASE_PASS}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - /STORAGE/docker/graffiti_wars/database:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-graffiti_wars}"]
       interval: 10s
@@ -35,6 +35,3 @@ services:
       - "2432:5000"
     volumes:
       - /STORAGE/docker/graffiti_wars:/app/assets
-
-volumes:
-  db_data:

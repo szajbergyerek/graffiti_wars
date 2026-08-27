@@ -2,6 +2,7 @@ import logging
 
 from dotenv import load_dotenv
 from flask import Flask, g, request
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from endpoints.admin import bp_admin
 from endpoints.assets import bp_assets
@@ -30,6 +31,7 @@ def create_app() -> Flask:
     :return: A fully configured Flask app, with the database schema ensured to exist.
     """
     app = Flask(__name__)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     config = Config()
     app.config["SECRET_KEY"] = config.secret_key
     app.config["SQLALCHEMY_DATABASE_URI"] = config.database_uri
