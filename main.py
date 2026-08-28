@@ -42,7 +42,6 @@ def create_app() -> Flask:
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["MAX_CONTENT_LENGTH"] = config.max_content_length
     app.config["IMAGES_ROOT"] = config.images_root
-    app.config["DEV_AUTO_LOGIN"] = config.dev_auto_login
 
     db.init_app(app)
     login_manager.init_app(app)
