@@ -746,11 +746,30 @@ not in this Flask app: `C:\DaBalint\Projects\Python\graffiti_wars_ai\`.
 container names `graffiti_wars-web-1` / `graffiti_wars-db-1`, published on
 host port **2432** (`web`'s container port 5000 → host 2432), reachable
 publicly at `https://graffiti.balintdaniel.com/` via the user's existing
-nginx proxy manager setup. Volumes: Postgres data at
-`/STORAGE/docker/graffiti_wars/database`, uploaded images at
-`/STORAGE/docker/graffiti_wars` mounted to `/app/assets` inside the
-container (note: NOT `/app/assets/images` — the host folder becomes the
-parent of the `images/` subfolder the app itself creates).
+nginx proxy manager setup.
+
+**Volume host paths, now derived from a single `STORAGE_PATH` env var**
+(optional, defaults to `/STORAGE/docker/graffiti_wars` if unset - see
+`.env.example`): `${STORAGE_PATH}/database` → Postgres data,
+`${STORAGE_PATH}/website` → `/app/assets` inside the container (note: NOT
+`/app/assets/images` — the mounted folder becomes the parent of the
+`images/` subfolder the app itself creates).
+
+**⚠️ This changed the assets mount path from the base `STORAGE_PATH` folder
+itself to a `website` subfolder of it** (was: `/STORAGE/docker/graffiti_wars`
+→ `/app/assets` directly; now: `/STORAGE/docker/graffiti_wars/website` →
+`/app/assets`) — the `database` subfolder mount is unaffected (already had
+its own subfolder, still does). **This means on the actual production
+server, the existing uploaded-images folder needs to be moved** from
+`/STORAGE/docker/graffiti_wars/images` to
+`/STORAGE/docker/graffiti_wars/website/images` before/when this compose
+change is deployed there, or every previously uploaded image will appear
+missing (404 on `/assets/images/...`) even though the files still physically
+exist at the old path, just no longer mounted into the container. As of this
+writing it's unclear whether the user has actually performed this move on
+the live server yet — check before assuming uploaded images work on a fresh
+deploy of this config, and don't touch the `database` subfolder during any
+such move (it's already correctly placed and unaffected).
 
 **Google OAuth for this deployment**: the redirect URI registered in Google
 Cloud Console must be exactly `https://graffiti.balintdaniel.com/auth/google/callback`.
