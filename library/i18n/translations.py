@@ -236,15 +236,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "hu": "A tag felkerült a térképre! A terület frissült.",
         "en": "The tag is on the map! The territory has been updated.",
     },
-    "flash.photo_no_capture_time": {
-        "hu": "A fotó nem tartalmaz készítési időpontot, nem tudjuk ellenőrizni a frissességét.",
-        "en": "The photo has no capture timestamp, so we can't verify how fresh it is.",
-    },
-    "flash.photo_too_old": {
-        "hu": "A fotónak frissen, most kell készülnie - ez a kép régebbi 1 percnél.",
-        "en": "The photo must be freshly taken, right now - this one is older than 1 minute.",
-    },
-    "flash.submission_cancelled": {"hu": "A feltöltés megszakítva.", "en": "The submission was cancelled."},
     "flash.report_thanks": {
         "hu": "Köszönjük a jelzést, az admin csapat megvizsgálja.",
         "en": "Thanks for the report, the admin team will look into it.",
@@ -285,17 +276,21 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "tag.field_description": {"hu": "Leírás (opcionális)", "en": "Description (optional)"},
     "tag.submit_button": {"hu": "Tovább", "en": "Continue"},
-    "tag.upload_help": {
-        "hu": "A fotónak most, a helyszínen készültnek kell lennie - ne tölts fel régebbi képet.",
-        "en": "The photo must be taken right now, on the spot - don't upload an older picture.",
+    "tag.camera_shutter": {"hu": "Fénykép készítése", "en": "Take photo"},
+    "tag.camera_back_button": {"hu": "Vissza a térképre", "en": "Back to the map"},
+    "tag.camera_unavailable": {
+        "hu": "A böngésződ nem támogatja a kamera használatát ezen az oldalon.",
+        "en": "Your browser doesn't support using the camera on this page.",
     },
-    "tag.locate_title": {"hu": "Erősítsd meg a helyet", "en": "Confirm the location"},
-    "tag.locate_help": {
-        "hu": "A fotódnak nem volt GPS-adata. Engedélyezd a helymeghatározást, vagy állítsd be kézzel a térképen.",
-        "en": "Your photo had no GPS data. Allow location access, or set it manually on the map.",
+    "tag.camera_permission_denied": {
+        "hu": "Nem sikerült elérni a kamerát. Engedélyezd a kamera-hozzáférést a böngésző beállításaiban, majd próbáld újra.",
+        "en": "Couldn't access the camera. Allow camera access in your browser settings and try again.",
+    },
+    "tag.location_unavailable": {
+        "hu": "Nem sikerült lekérni a helyzetedet. Engedélyezd a helymeghatározást a böngésző beállításaiban, majd próbáld újra.",
+        "en": "Couldn't get your location. Allow location access in your browser settings and try again.",
     },
     "tag.accept_button": {"hu": "Elfogadás", "en": "Accept"},
-    "tag.cancel_button": {"hu": "Mégse", "en": "Cancel"},
     "tag.processing_title": {"hu": "Feldolgozás...", "en": "Processing..."},
     "tag.processing_message": {
         "hu": "Az AI most ellenőrzi a taget. Ez csak néhány másodpercig tart.",
@@ -310,6 +305,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "tag.detail_band": {"hu": "Banda", "en": "Gang"},
     "tag.detail_uploaded_at": {"hu": "Feltöltve", "en": "Uploaded at"},
     "tag.detail_area_added": {"hu": "Ezzel hozzáadott terület", "en": "Territory added by this tag"},
+    "tag.description_placeholder": {"hu": "Adj hozzá egy leírást...", "en": "Add a description..."},
+    "tag.description_save_button": {"hu": "Leírás mentése", "en": "Save description"},
     "tag.report_button": {"hu": "Tag jelentése", "en": "Report this tag"},
     "tag.confirm_report": {"hu": "Biztosan jelented ezt a taget?", "en": "Are you sure you want to report this tag?"},
     "tag.report_title": {"hu": "Miért jelented ezt a taget?", "en": "Why are you reporting this tag?"},

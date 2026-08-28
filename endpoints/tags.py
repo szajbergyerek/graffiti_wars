@@ -1,12 +1,13 @@
 import logging
-import os
+import threading
 from datetime import datetime
 
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from library.extensions import db
+from library.models.band import Band
 from library.models.chat_message import ChatMessage
 from library.models.conversation import Conversation
 from library.models.image import Image
@@ -15,7 +16,6 @@ from library.models.tag_comment import TagComment
 from library.models.tag_point import TagPoint
 from library.models.tag_report import TagReport
 from library.models.tag_visit import TagVisit
-from library.services.exif_extractor import ExifExtractor
 from library.services.image_storage import ImageStorage
 from library.services.landmark_service import LandmarkService
 from library.services.territory_engine import TerritoryEngine
@@ -24,9 +24,27 @@ from library.services.translator import t
 bp_tags = Blueprint("tags", __name__)
 landmark_service = LandmarkService()
 
-MAX_PHOTO_AGE_SECONDS = 60
-
 logger = logging.getLogger("tag_submission")
+
+
+def _refresh_landmarks_async(app, band_id: int) -> None:
+    """
+    Re-fetch a band's OpenStreetMap landmarks in a background thread.
+
+    The public Overpass API can take up to its own 25s timeout to respond (or
+    longer to fail), which is far too slow to hold up the tag-submission
+    response for - this runs it off the request thread instead.
+
+    param app: The real Flask app object (not the `current_app` proxy, which
+        isn't valid outside a request context) needed to open a fresh app context.
+    param band_id: The id of the band whose landmarks should be refreshed.
+
+    :return: None.
+    """
+    with app.app_context():
+        band = db.session.get(Band, band_id)
+        if band is not None:
+            landmark_service.refresh_for_band(band)
 
 
 @bp_tags.route("/map")
@@ -62,9 +80,10 @@ def submit_tag():
     if request.method == "POST":
         photo = request.files.get("photo")
         client_now_raw = request.form.get("client_now")
-        description = request.form.get("description", "").strip()[:500]
+        lat = request.form.get("lat", type=float)
+        lon = request.form.get("lon", type=float)
 
-        if photo is None or photo.filename == "" or not client_now_raw:
+        if photo is None or photo.filename == "" or not client_now_raw or lat is None or lon is None:
             flash(t("flash.tag_missing_fields"), "error")
             return render_template("tag_submit_upload.html")
 
@@ -81,64 +100,20 @@ def submit_tag():
             flash(t("flash.unsupported_image"), "error")
             return render_template("tag_submit_upload.html")
 
-        metadata = ExifExtractor().extract(os.path.join(images_root, image.relative_path))
+        # The photo comes from an in-page live camera capture and lat/lon from
+        # the browser's Geolocation API, both captured right after the shutter
+        # tap (see tag_submit_upload.html) - no EXIF/file-picker metadata is
+        # involved and the location isn't user-editable.
         logger.info(
-            "Tag photo uploaded by %s: image_id=%s client_now=%s metadata=%s",
-            current_user.username, image.id, client_now, metadata,
+            "Tag photo uploaded by %s: image_id=%s client_now=%s lat=%s lon=%s",
+            current_user.username, image.id, client_now, lat, lon,
         )
 
-        date_taken = metadata["date_taken"]
-        if date_taken is None:
-            flash(t("flash.photo_no_capture_time"), "error")
-            return render_template("tag_submit_upload.html")
-
-        age_seconds = abs((client_now - date_taken).total_seconds())
-        if age_seconds > MAX_PHOTO_AGE_SECONDS:
-            flash(t("flash.photo_too_old"), "error")
-            return render_template("tag_submit_upload.html")
-
         db.session.commit()
 
-        if metadata["gps_lat"] is not None and metadata["gps_lon"] is not None:
-            return redirect(
-                url_for(
-                    "tags.processing",
-                    image_id=image.id,
-                    lat=metadata["gps_lat"],
-                    lon=metadata["gps_lon"],
-                    description=description,
-                )
-            )
-
-        return redirect(url_for("tags.locate", image_id=image.id, description=description))
+        return redirect(url_for("tags.processing", image_id=image.id, lat=lat, lon=lon))
 
     return render_template("tag_submit_upload.html")
-
-
-@bp_tags.route("/tags/submit/locate")
-@login_required
-def locate():
-    image_id = request.args.get("image_id", type=int)
-    description = request.args.get("description", "")
-    try:
-        _get_own_pending_image(image_id)
-    except (PermissionError, ValueError):
-        return redirect(url_for("tags.submit_tag"))
-
-    return render_template("tag_submit_locate.html", image_id=image_id, description=description)
-
-
-@bp_tags.route("/tags/submit/cancel", methods=["POST"])
-@login_required
-def cancel_submission():
-    image_id = request.form.get("image_id", type=int)
-    image = Image.query.filter_by(id=image_id, uploaded_by_id=current_user.id).first()
-    if image is not None and TagPoint.query.filter_by(photo_image_id=image.id).first() is None:
-        db.session.delete(image)
-        db.session.commit()
-
-    flash(t("flash.submission_cancelled"), "success")
-    return redirect(url_for("tags.map_view"))
 
 
 @bp_tags.route("/tags/submit/processing")
@@ -193,7 +168,11 @@ def finalize():
     db.session.commit()
 
     TerritoryEngine(radius_meters=current_app.config["TAG_RADIUS_METERS"]).recompute_all()
-    landmark_service.refresh_for_band(current_user.band)
+    threading.Thread(
+        target=_refresh_landmarks_async,
+        args=(current_app._get_current_object(), current_user.band_id),
+        daemon=True,
+    ).start()
     db.session.add(
         NewsFeedEvent(
             event_type="tag_approved",
@@ -221,7 +200,7 @@ def finalize():
 
     db.session.commit()
 
-    return jsonify({"redirect_url": url_for("tags.map_view")})
+    return jsonify({"redirect_url": url_for("tags.tag_detail", tag_id=tag_point.id)})
 
 
 @bp_tags.route("/tags/<int:tag_id>")
@@ -235,6 +214,19 @@ def tag_detail(tag_id: int):
         tag_point=tag_point,
         area_added_km2=area_added_km2,
     )
+
+
+@bp_tags.route("/tags/<int:tag_id>/description", methods=["POST"])
+@login_required
+def update_description(tag_id: int):
+    tag_point = TagPoint.query.get_or_404(tag_id)
+    if tag_point.submitted_by_id != current_user.id:
+        abort(403)
+
+    tag_point.description = request.form.get("description", "").strip()[:500] or None
+    db.session.commit()
+
+    return redirect(url_for("tags.tag_detail", tag_id=tag_id))
 
 
 @bp_tags.route("/api/tags/<int:tag_id>/comments")

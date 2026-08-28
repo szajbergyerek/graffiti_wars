@@ -1,5 +1,5 @@
-from flask import Blueprint, flash, redirect, url_for
-from flask_login import login_required, login_user, logout_user
+from flask import Blueprint, current_app, flash, redirect, url_for
+from flask_login import current_user, login_required, login_user, logout_user
 
 from library.extensions import db, login_manager, oauth
 from library.models.user import User
@@ -8,6 +8,10 @@ from library.services.username_validator import UsernameValidator
 
 bp_auth = Blueprint("auth", __name__)
 username_validator = UsernameValidator()
+
+DEV_ADMIN_GOOGLE_ID = "dev-auto-admin"
+DEV_ADMIN_EMAIL = "dev-admin@localhost.test"
+DEV_ADMIN_USERNAME = "dev_admin"
 
 
 @login_manager.user_loader
@@ -73,6 +77,48 @@ def _find_or_create_user(google_id: str, email: str, name: str, picture: str) ->
     )
     db.session.add(user)
     return user, True
+
+
+def _get_or_create_dev_admin() -> User:
+    """
+    Find or create the fixed admin account used for automatic dev login.
+
+    param: None.
+
+    :return: The dev admin User, created on first use if it doesn't exist yet.
+    """
+    user = User.query.filter_by(google_id=DEV_ADMIN_GOOGLE_ID).first()
+    if user is not None:
+        return user
+
+    user = User(
+        username=DEV_ADMIN_USERNAME,
+        email=DEV_ADMIN_EMAIL,
+        google_id=DEV_ADMIN_GOOGLE_ID,
+        avatar_seed=DEV_ADMIN_USERNAME,
+        is_admin=True,
+    )
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
+@bp_auth.before_app_request
+def _dev_auto_login() -> None:
+    """
+    Automatically log in as a fixed local admin account when DEV_AUTO_LOGIN is
+    enabled, so the app can be tested from a phone over a plain-HTTP LAN
+    address where Google OAuth's HTTPS requirement can't be satisfied.
+
+    param: None.
+
+    :return: None.
+    """
+    if not current_app.config.get("DEV_AUTO_LOGIN"):
+        return
+    if current_user.is_authenticated:
+        return
+    login_user(_get_or_create_dev_admin())
 
 
 @bp_auth.route("/login")

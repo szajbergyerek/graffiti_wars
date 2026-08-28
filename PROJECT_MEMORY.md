@@ -236,20 +236,69 @@ Unchanged from before: 6 top-level OSM categories (`amenity`, `shop`,
 instance is slow/flaky (2–25+s, occasional timeouts) and this is handled
 gracefully already.
 
-## Tag submission flow (multi-step wizard)
+## Tag submission flow (rewritten this session — live camera + geolocation, no EXIF)
 
-Same 3-step shape as before (`/tags/submit` → `/tags/submit/locate` (if no
-GPS) → `/tags/submit/processing` → `POST /tags/submit/finalize`), with one
-addition: an optional **description** field on the first upload form,
-threaded through every step the same way `image_id`/`lat`/`lon` already
-were (querystring param → hidden form field → fetch body), landing on
-`TagPoint.description`. `finalize()` also now:
+**This replaced the older EXIF/file-picker-based flow described in earlier
+revisions of this file.** If you find any old note about a `/tags/submit/locate`
+step, an EXIF freshness check, or a `description` field on the first page,
+that's stale — the flow below is current.
 
-- Posts a **`ChatMessage` with `message_type="tag_added"`** into the
-  submitting band's own conversation, wording depends on whether the tag's
-  cached `area_added_km2 > 0` ("captured new territory" vs. "tagged within
-  existing territory") — see "Chat system messages" below.
-- No longer touches `TagLike` (removed) or the old `TagVerifier` (deleted).
+`/tags/submit` (GET) now renders `tag_submit_upload.html`, a **full-screen
+live camera capture page**, not an upload form:
+
+1. On load, it calls `navigator.mediaDevices.getUserMedia({video: {facingMode:
+   "environment"}})` and shows the live feed full-bleed with one circular
+   shutter button — no file `<input>` exists anywhere in this flow, so there
+   is no way to pick an old photo from disk/gallery (this was a deliberate
+   fix: canvas-exported images never carry EXIF, and file pickers let users
+   browse old photos, defeating any "must be fresh" intent).
+2. Tapping the shutter draws the current video frame to a hidden `<canvas>`,
+   exports it as a JPEG blob, stamps a `client_now` timestamp (the actual
+   moment of the tap), then **immediately** calls
+   `navigator.geolocation.getCurrentPosition()` — no manual location picker,
+   the location is not user-editable.
+3. Once geolocation resolves, a `fetch()` POST sends `photo` + `client_now`
+   + `lat` + `lon` (all in one shot, no separate confirm step) to
+   `POST /tags/submit`. On success (redirect) it navigates to
+   `/tags/submit/processing`; on a validation error the JSON... actually HTML
+   error response is swapped in via `document.open()/write()/close()` so the
+   flash message still shows without a full page reload.
+4. If camera or geolocation permission is denied/unavailable, an inline
+   error is shown (camera failure replaces the whole view with a "back to
+   map" link; geolocation failure shows a dismissable banner over the live
+   feed and re-arms the shutter button so the user can retry).
+5. `/tags/submit/processing` → `POST /tags/submit/finalize` unchanged from
+   before (2.2s spinner, then finalize creates the `TagPoint`).
+
+**Removed entirely as part of this rewrite** (don't re-add unasked):
+- `ExifExtractor` / `library/services/exif_extractor.py` — deleted. It had a
+  real bug (read `DateTimeOriginal`/`DateTimeDigitized` from the wrong IFD,
+  always returning `None`), but even after fixing that, real-world photos
+  captured via a browser `<input capture>` on iOS Safari turned out to carry
+  **no EXIF date or GPS at all** (Apple strips it from web-facing camera
+  captures for privacy) — confirmed against real uploaded photos this
+  session. That's what motivated the switch to live `getUserMedia` capture
+  instead of relying on EXIF/file-picker metadata at all.
+- `MAX_PHOTO_AGE_SECONDS` / the 60-second EXIF-freshness check in
+  `submit_tag()` — meaningless now since canvas exports have no EXIF and the
+  live-camera-only UI already structurally prevents uploading an old photo.
+- `/tags/submit/locate` route + `tag_submit_locate.html` (manual map-based
+  location picker) and `/tags/submit/cancel` — both dead once location comes
+  from `getUserMedia`-adjacent `getCurrentPosition()` unconditionally.
+- The optional **description** field on the first page (from an earlier
+  round) — also dropped when the page became camera-only. `TagPoint.description`
+  the column still exists and `finalize()` still accepts an (now always-empty)
+  `description` form field, so it's trivial to wire a description entry point
+  back in at some later step if asked — just not on the camera page itself.
+- Translation keys removed with the above: `flash.photo_no_capture_time`,
+  `flash.photo_too_old`, `flash.submission_cancelled`, `tag.upload_help`,
+  `tag.locate_title`, `tag.locate_help`, `tag.cancel_button`.
+
+**Next planned step (not yet started, explicitly deferred by the user)**: AI
+verification is meant to plug in after this camera+geolocation flow — i.e.
+once the photo+location lands in `finalize()`, that's the intended
+integration point for the real verification model from the separate
+`graffiti_wars_ai` sub-project (see "AI verification" below). Not implemented yet.
 
 **Still true**: `ImageStorage.save()` only flushes, doesn't commit — each
 wizard step boundary needs its own `db.session.commit()`.

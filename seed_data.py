@@ -17,6 +17,7 @@ from PIL import Image as PILImage
 from sqlalchemy import text
 from werkzeug.datastructures import FileStorage
 
+from endpoints.auth import DEV_ADMIN_EMAIL, DEV_ADMIN_GOOGLE_ID, DEV_ADMIN_USERNAME
 from main import create_app
 from library.extensions import db
 from library.i18n.countries import COUNTRIES
@@ -51,12 +52,12 @@ def _generate_placeholder_images(storage: ImageStorage) -> list:
     db.session.commit()
     return image_ids
 
-TOTAL_USERS = 1111
-TOTAL_BANDS = 125
+TOTAL_USERS = 410  # comfortably covers the worst case of 50 bands x 8 members
+TOTAL_BANDS = 50
+TARGET_TOTAL_TAGS = 210
+MIN_TEST_GANG_TAGS = 5
 MIN_MEMBERS_PER_BAND = 2
 MAX_MEMBERS_PER_BAND = 8
-MIN_TAGS_PER_MEMBER = 2
-MAX_TAGS_PER_MEMBER = 8
 
 ADJECTIVES = [
     "silent", "crimson", "voidwalker", "static", "neon", "phantom", "iron", "glitch",
@@ -139,16 +140,16 @@ def main() -> None:
         new_users = []
 
         admin_user = User(
-            username="leaderA",
-            email="leaderA@example.test",
-            google_id="seed-leaderA",
-            avatar_seed="leaderA",
+            username=DEV_ADMIN_USERNAME,
+            email=DEV_ADMIN_EMAIL,
+            google_id=DEV_ADMIN_GOOGLE_ID,
+            avatar_seed=DEV_ADMIN_USERNAME,
             is_admin=True,
             nationality_code="HU",
             created_at=datetime.utcnow() - timedelta(days=200),
         )
         db.session.add(admin_user)
-        existing_usernames.add("leaderA")
+        existing_usernames.add(DEV_ADMIN_USERNAME)
         new_users.append(admin_user)
 
         for _ in range(TOTAL_USERS - 1):
@@ -168,15 +169,23 @@ def main() -> None:
 
         unassigned = list(new_users)
         random.shuffle(unassigned)
-        # Keep leaderA at the front of the line so it always leads the first band.
+        # Keep the dev-admin at the front of the line so it always leads band 0 ("Test Gang").
         unassigned.remove(admin_user)
         unassigned.insert(0, admin_user)
 
         bands_created = []
         tags_created = 0
 
+        # Distribute TARGET_TOTAL_TAGS across the bands roughly evenly, then make
+        # sure band 0 (the dev-admin's "Test Gang") gets at least a handful, since
+        # it's used for local auto-login testing and should never come up empty.
+        tag_counts_per_band = [0] * TOTAL_BANDS
+        for _ in range(TARGET_TOTAL_TAGS):
+            tag_counts_per_band[random.randrange(TOTAL_BANDS)] += 1
+        tag_counts_per_band[0] = max(tag_counts_per_band[0], MIN_TEST_GANG_TAGS)
+
         print(f"Creating up to {TOTAL_BANDS} bands...")
-        for _ in range(TOTAL_BANDS):
+        for band_index in range(TOTAL_BANDS):
             member_count = random.randint(MIN_MEMBERS_PER_BAND, MAX_MEMBERS_PER_BAND)
             if len(unassigned) < member_count:
                 break
@@ -184,7 +193,7 @@ def main() -> None:
             members = [unassigned.pop(0) for _ in range(member_count)]
             leader = members[0]
 
-            name = random_band_name(existing_band_names)
+            name = "Test Gang" if band_index == 0 else random_band_name(existing_band_names)
             created_at = datetime.utcnow() - timedelta(days=random.randint(5, 250))
 
             band = Band(
@@ -221,25 +230,24 @@ def main() -> None:
             center_lat = random.uniform(*CENTER_LAT_RANGE)
             center_lon = random.uniform(*CENTER_LON_RANGE)
 
-            for member in members:
-                tag_count = random.randint(MIN_TAGS_PER_MEMBER, MAX_TAGS_PER_MEMBER)
-                for _ in range(tag_count):
-                    lat, lon = offset_point(center_lat, center_lon, max_radius_m=250)
-                    tag_created_at = created_at + timedelta(
-                        days=random.randint(0, 200), hours=random.randint(0, 23)
+            for _ in range(tag_counts_per_band[band_index]):
+                member = random.choice(members)
+                lat, lon = offset_point(center_lat, center_lon, max_radius_m=250)
+                tag_created_at = created_at + timedelta(
+                    days=random.randint(0, 200), hours=random.randint(0, 23)
+                )
+                db.session.add(
+                    TagPoint(
+                        band_id=band.id,
+                        submitted_by_id=member.id,
+                        photo_image_id=random.choice(image_pool),
+                        lat=lat,
+                        lon=lon,
+                        status="approved",
+                        created_at=tag_created_at,
                     )
-                    db.session.add(
-                        TagPoint(
-                            band_id=band.id,
-                            submitted_by_id=member.id,
-                            photo_image_id=random.choice(image_pool),
-                            lat=lat,
-                            lon=lon,
-                            status="approved",
-                            created_at=tag_created_at,
-                        )
-                    )
-                    tags_created += 1
+                )
+                tags_created += 1
 
             db.session.add(
                 NewsFeedEvent(

@@ -41,6 +41,7 @@ def create_app() -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = config.max_content_length
     app.config["TAG_RADIUS_METERS"] = config.tag_radius_meters
     app.config["IMAGES_ROOT"] = config.images_root
+    app.config["DEV_AUTO_LOGIN"] = config.dev_auto_login
 
     db.init_app(app)
     login_manager.init_app(app)
