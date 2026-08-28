@@ -87,7 +87,6 @@ templates/                  # Jinja2, extends base.html (the app shell)
 static/css/style.css        # One shared stylesheet, CSS variables for theme
 static/js/app.js            # One shared JS file: map init, chat polling, infinite scroll
 assets/images/               # Uploaded images, hash-named, gitignored
-mockup/                     # Early static HTML/CSS design mockup, not wired to Flask
 ```
 
 A **separate sibling project**, `C:\DaBalint\Projects\Python\graffiti_wars_ai\`
@@ -653,6 +652,12 @@ for anonymous users (see "Navigation" above).
 
 ## Removed features (don't re-add without being asked)
 
+- **The entire `mockup/` folder** — an early static HTML/CSS design mockup
+  from before the real Flask templates existed, never wired to the app
+  (confirmed unused: no references anywhere in `main.py`/`endpoints/`/`templates/`,
+  and it was already excluded from Docker builds via `.dockerignore`). Deleted
+  wholesale, including its own `mockup/js/app.js` and `mockup/css/style.css` —
+  don't recreate a parallel static mockup, the real templates are the design now.
 - **Tag likes** — see above.
 - **Chat unread-message badge/counter** — the little red badge on the
   Profile tab icon, plus `ChatService.unread_count()`, the

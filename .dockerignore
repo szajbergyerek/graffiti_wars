@@ -10,7 +10,6 @@ __pycache__
 !.env.example
 assets/images
 static/uploads
-mockup
 dev_motes.md
 PROJECT_MEMORY.md
 README.md
