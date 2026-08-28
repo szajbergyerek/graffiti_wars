@@ -818,11 +818,18 @@ under the scratchpad directory instead.** Don't repeat this class of mistake.
   fully set up as of this writing — the user was mid-decision on which
   approach to use for phone-based local testing when this file was last
   updated.
-- `git remote origin` → `https://github.com/szajbergyerek/graffiti_wars.git`.
-  Two branches exist, `main` and `dev` — `dev`'s history is fully contained
-  within `main` (nothing unique on `dev`), `main` is the current/ahead
-  branch and should be treated as the working branch. Working tree was
-  clean (no uncommitted changes) as of the last session.
+- **`git remote origin` moved this session** from `https://github.com/szajbergyerek/graffiti_wars.git`
+  to `https://github.com/Graffiti-War/website.git` (a new org repo the user
+  created) — both `main` and `dev` were pushed there (`dev`'s history is
+  fully contained within `main`, nothing unique on it). The old repo was
+  left untouched (not deleted, not archived) - only `origin` was
+  repointed, nothing was done on the szajbergyerek side. If you see any
+  stale reference to the old URL anywhere (docs, CI, deploy scripts), it's
+  leftover from before this move.
+  Also removed this session: the whole `mockup/` folder (unused static
+  design mockup, see "Removed features") and a short-lived GitHub Actions
+  workflow that stamped the commit hash into `docker-compose.yml`'s first
+  line (the user asked for it, then decided against it before the repo move).
 
 ## How to resume a session with this project
 
