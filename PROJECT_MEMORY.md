@@ -789,47 +789,75 @@ already internalized: **never write test/dummy values into a file that might
 be the user's real config — copy it aside first, or write to a separate file
 under the scratchpad directory instead.** Don't repeat this class of mistake.
 
-## CI/CD (GitHub Actions → GHCR → Portainer webhook, set up this session)
+## CI/CD (GitHub Actions → Portainer webhook over WireGuard)
 
-`.github/workflows/build-and-push.yml`, two jobs, triggered on every push to
-`main` (direct commit or merged PR):
+`.github/workflows/deploy.yml`, one job, triggered on every push to `main`
+(direct commit or merged PR). **There is no build/registry step** — see
+"GHCR + org repo attempt, abandoned" below for why. Portainer's stack is
+Git-linked directly to this repo with `build: .`, so a redeploy re-clones
+and rebuilds the image itself; CI's only job is to *tell* Portainer to do
+that:
 
-1. **`build-and-push`** — builds the `Dockerfile`, pushes
-   `ghcr.io/graffiti-war/website:latest` and `:<commit-sha>` to **GitHub
-   Container Registry**, authenticating with the built-in `GITHUB_TOKEN`
-   (no registry secret needed for this half). Uses GHA cache for faster
-   rebuilds.
-2. **`deploy`** (needs: build-and-push) — the home server's Portainer isn't
-   publicly reachable, only via WireGuard, so this job: installs
-   `wireguard`+`openresolv` on the runner, writes the **`WG_CONFIG`** repo
-   secret (the full contents of the user's WireGuard client `.conf` file,
-   split-tunnel to `10.8.0.0/24` + `10.20.30.0/24` via
-   `wireguard.balintdaniel.com:51820`) to `/etc/wireguard/wg0.conf`, brings
-   the tunnel up, `curl -X POST`s the **`PORTAINER_WEBHOOK_URL`** repo secret
-   (a Portainer *stack* redeploy webhook — calling it makes Portainer re-pull
-   and recreate the stack), then tears the tunnel down.
-
-**`docker-compose.yml`'s `web` service was changed from `build: .` to
-`image: ghcr.io/graffiti-war/website:latest`** as part of this same change —
-without this, the webhook-triggered redeploy would have nothing new to pull
-and would just recreate the container from whatever was last built locally.
-This is a real, easy-to-miss trap if this pipeline is ever touched again:
-CI building+pushing an image is pointless unless the compose file actually
-references that image.
+- The home server's Portainer isn't publicly reachable, only via WireGuard,
+  so the job installs `wireguard` on the runner, writes the **`WG_CONFIG`**
+  repo secret (the full contents of the user's WireGuard client `.conf`
+  file, split-tunnel to `10.8.0.0/24` + `10.20.30.0/24` via
+  `wireguard.balintdaniel.com:51820`, DNS line stripped since the
+  `openresolv` package `wg-quick` would otherwise need isn't available on
+  the `ubuntu-latest` runner and isn't needed anyway) to
+  `/etc/wireguard/wg0.conf`, brings the tunnel up, `curl -X POST`s the
+  **`PORTAINER_WEBHOOK_URL`** repo secret (a Portainer *stack* redeploy
+  webhook), then tears the tunnel down.
 
 **Two secrets live only in GitHub** (repo Settings → Secrets and variables →
-Actions), never committed, never printed into a chat transcript — the user
-added them manually after being told to, not automated by Claude (no `gh`
-CLI or API token was available in-session, and a WireGuard private key /
-webhook URL shouldn't pass through a third party regardless):
+Actions), never committed, never printed into a chat transcript in full —
+the user added them manually after being told to, not automated by Claude
+(no `gh` CLI or API token was available in-session, and a WireGuard private
+key / webhook URL shouldn't pass through a third party regardless):
 - `WG_CONFIG` — the WireGuard client config content.
 - `PORTAINER_WEBHOOK_URL` — `https://portainer.balintdaniel.com/api/stacks/webhooks/<uuid>`.
+  **These need to be re-added under the `szajbergyerek/graffiti_wars` repo's
+  own secrets** (repo secrets don't carry over between repos) — they were
+  originally added under the now-abandoned `Graffiti-War/website` repo; as
+  of this writing it's unconfirmed whether the user re-added them here yet.
 
-**Not yet verified/handled, worth checking if this pipeline misbehaves**:
-whether the `ghcr.io/graffiti-war/website` package is public or private. If
-private, Portainer needs its own registry credentials configured (Portainer
-→ Registries) to pull it, or the package needs to be made public in GitHub's
-package settings — this was flagged to the user but not confirmed resolved.
+### GHCR + org repo attempt, abandoned this session
+
+The project briefly lived in a new `Graffiti-War` GitHub organization
+(`github.com/Graffiti-War/website`) with a full build-and-push-to-GHCR
+pipeline (`ghcr.io/graffiti-war/website`, `docker-compose.yml`'s `web`
+using `image:` instead of `build: .`, a `WEB_IMAGE` env var). **This was
+fully reverted** — don't reintroduce any of it unasked. What happened, in
+case the org repo idea comes back:
+
+- GHCR pulls themselves were solvable (a **classic** PAT with `read:packages`
+  + `repo` scopes, tested and confirmed working via both `docker login`/`pull`
+  and `git ls-remote` directly against the org repo).
+- **Portainer's Git-repository build method reliably failed** against the
+  org repo specifically — "authentication required: invalid credentials" /
+  "Unable to fetch git repository... failed to list repository refs" —
+  with the *exact same* classic PAT that was independently verified to
+  work fine via plain `git`/`docker` from the command line against that
+  same repo. The identical credentials worked without issue against the
+  user's personal repos in Portainer. This looks like a Portainer ↔
+  GitHub-organization-repo interaction bug (possibly version-specific),
+  not a credentials/scope problem — a fine-grained PAT was also tried and
+  definitively failed (403 on both git and registry) regardless.
+- Rather than keep chasing that, the user said to abandon the org
+  entirely and move back to `https://github.com/szajbergyerek/graffiti_wars`
+  ("hagyjuk az organisatont a fenébe") with a simpler pipeline: no
+  build/registry step at all, Portainer builds locally via its (working)
+  Git link to the personal repo, CI only fires the redeploy webhook.
+- `git remote origin` was pointed back at
+  `https://github.com/szajbergyerek/graffiti_wars.git`; the personal repo's
+  own `main` had drifted one commit ahead in the meantime (a leftover
+  `[skip ci]` stamp-commit from the *even earlier* abandoned
+  commit-hash-stamping workflow, from before the org move) — merged rather
+  than force-pushed, to avoid losing anything, then the stale stamp comment
+  was cleaned out of `docker-compose.yml`'s first line by hand.
+- The `Graffiti-War` org and its `website` repo were **not deleted** —
+  only abandoned/unused. Don't assume they're gone if you see a reference
+  to them somewhere.
 
 - **Every** user-facing string goes in `library/i18n/translations.py` as
   `"key": {"hu": "...", "en": "..."}`. Never hardcode UI text in a template
@@ -879,18 +907,34 @@ package settings — this was flagged to the user but not confirmed resolved.
   fully set up as of this writing — the user was mid-decision on which
   approach to use for phone-based local testing when this file was last
   updated.
-- **`git remote origin` moved this session** from `https://github.com/szajbergyerek/graffiti_wars.git`
-  to `https://github.com/Graffiti-War/website.git` (a new org repo the user
-  created) — both `main` and `dev` were pushed there (`dev`'s history is
-  fully contained within `main`, nothing unique on it). The old repo was
-  left untouched (not deleted, not archived) - only `origin` was
-  repointed, nothing was done on the szajbergyerek side. If you see any
-  stale reference to the old URL anywhere (docs, CI, deploy scripts), it's
-  leftover from before this move.
+- **`git remote origin` is `https://github.com/szajbergyerek/graffiti_wars.git`**
+  — this is back to being the current/canonical location. It was briefly
+  moved to a new `Graffiti-War` org repo this same session and then moved
+  *back* after the org repo's Portainer integration turned out to be
+  broken — see "GHCR + org repo attempt, abandoned" above for the full
+  story. Don't be surprised by a `Graffiti-War/website` repo still existing
+  on GitHub; it's dead/unused, not the canonical repo.
   Also removed this session: the whole `mockup/` folder (unused static
-  design mockup, see "Removed features") and a short-lived GitHub Actions
+  design mockup, see "Removed features"), a short-lived GitHub Actions
   workflow that stamped the commit hash into `docker-compose.yml`'s first
-  line (the user asked for it, then decided against it before the repo move).
+  line (tried, then abandoned before the org-repo move even happened), and
+  the `DEV_AUTO_LOGIN` backdoor-login mechanism (see below).
+
+## Removed: `DEV_AUTO_LOGIN` backdoor login
+
+The local-testing convenience where an unset-Google-login request
+auto-logged in as a fixed admin account (`endpoints/auth.py`'s
+`_dev_auto_login()`/`_get_or_create_dev_admin()`, `DEV_AUTO_LOGIN` env var
+in `Config`/`main.py`) was **fully removed this session** at the user's
+request ("nem kell már hogy magától belépjen egy accountba"). All local
+testing now goes through real Google OAuth — no more backdoor. Don't
+reintroduce this without being explicitly asked again. The `DEV_ADMIN_*`
+identity constants (`DEV_ADMIN_GOOGLE_ID`/`EMAIL`/`USERNAME`) still live at
+the top of `auth.py` and are still used by `seed_data.py` to name its first
+seeded admin user — that part was deliberately left alone, it's just inert
+now (that seeded account has a fake `google_id` like every other seeded
+user, so it was never really "loggable into" except via the now-removed
+backdoor anyway).
 
 ## How to resume a session with this project
 
