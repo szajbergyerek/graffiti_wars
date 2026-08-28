@@ -1,5 +1,3 @@
-# 95bc98934e0c2385d2033349574077c8cdff761c
-
 services:
   db:
     image: postgres:16-alpine
