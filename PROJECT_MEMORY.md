@@ -768,7 +768,47 @@ already internalized: **never write test/dummy values into a file that might
 be the user's real config — copy it aside first, or write to a separate file
 under the scratchpad directory instead.** Don't repeat this class of mistake.
 
-## i18n rules — don't break these
+## CI/CD (GitHub Actions → GHCR → Portainer webhook, set up this session)
+
+`.github/workflows/build-and-push.yml`, two jobs, triggered on every push to
+`main` (direct commit or merged PR):
+
+1. **`build-and-push`** — builds the `Dockerfile`, pushes
+   `ghcr.io/graffiti-war/website:latest` and `:<commit-sha>` to **GitHub
+   Container Registry**, authenticating with the built-in `GITHUB_TOKEN`
+   (no registry secret needed for this half). Uses GHA cache for faster
+   rebuilds.
+2. **`deploy`** (needs: build-and-push) — the home server's Portainer isn't
+   publicly reachable, only via WireGuard, so this job: installs
+   `wireguard`+`openresolv` on the runner, writes the **`WG_CONFIG`** repo
+   secret (the full contents of the user's WireGuard client `.conf` file,
+   split-tunnel to `10.8.0.0/24` + `10.20.30.0/24` via
+   `wireguard.balintdaniel.com:51820`) to `/etc/wireguard/wg0.conf`, brings
+   the tunnel up, `curl -X POST`s the **`PORTAINER_WEBHOOK_URL`** repo secret
+   (a Portainer *stack* redeploy webhook — calling it makes Portainer re-pull
+   and recreate the stack), then tears the tunnel down.
+
+**`docker-compose.yml`'s `web` service was changed from `build: .` to
+`image: ghcr.io/graffiti-war/website:latest`** as part of this same change —
+without this, the webhook-triggered redeploy would have nothing new to pull
+and would just recreate the container from whatever was last built locally.
+This is a real, easy-to-miss trap if this pipeline is ever touched again:
+CI building+pushing an image is pointless unless the compose file actually
+references that image.
+
+**Two secrets live only in GitHub** (repo Settings → Secrets and variables →
+Actions), never committed, never printed into a chat transcript — the user
+added them manually after being told to, not automated by Claude (no `gh`
+CLI or API token was available in-session, and a WireGuard private key /
+webhook URL shouldn't pass through a third party regardless):
+- `WG_CONFIG` — the WireGuard client config content.
+- `PORTAINER_WEBHOOK_URL` — `https://portainer.balintdaniel.com/api/stacks/webhooks/<uuid>`.
+
+**Not yet verified/handled, worth checking if this pipeline misbehaves**:
+whether the `ghcr.io/graffiti-war/website` package is public or private. If
+private, Portainer needs its own registry credentials configured (Portainer
+→ Registries) to pull it, or the package needs to be made public in GitHub's
+package settings — this was flagged to the user but not confirmed resolved.
 
 - **Every** user-facing string goes in `library/i18n/translations.py` as
   `"key": {"hu": "...", "en": "..."}`. Never hardcode UI text in a template
