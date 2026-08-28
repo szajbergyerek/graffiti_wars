@@ -44,12 +44,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install WireGuard
-        run: sudo apt-get update && sudo apt-get install -y wireguard openresolv
+        run: sudo apt-get update && sudo apt-get install -y wireguard
 
       - name: Write WireGuard config
         run: |
           umask 077
-          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+          # Drop the DNS line - wg-quick would otherwise need resolvconf/openresolv
+          # (not available on this runner image) just to apply it, and the runner
+          # doesn't need it: only the routed subnets matter for reaching the
+          # Portainer webhook, not which DNS server answers the lookup.
+          echo "${{ secrets.WG_CONFIG }}" | grep -v '^DNS' > wg0.conf
           sudo mv wg0.conf /etc/wireguard/wg0.conf
 
       - name: Bring up WireGuard tunnel
