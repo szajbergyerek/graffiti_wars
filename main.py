@@ -10,6 +10,7 @@ from endpoints.assets import bp_assets
 from endpoints.auth import bp_auth
 from endpoints.bands import bp_bands
 from endpoints.chat import bp_chat
+from endpoints.dev_capture import bp_dev_capture
 from endpoints.feed import bp_feed
 from endpoints.index import bp_index
 from endpoints.leaderboard import bp_leaderboard
@@ -74,6 +75,7 @@ def create_app() -> Flask:
     app.register_blueprint(bp_admin)
     app.register_blueprint(bp_assets)
     app.register_blueprint(bp_chat)
+    app.register_blueprint(bp_dev_capture)
     app.register_blueprint(bp_feed)
     app.register_blueprint(bp_leaderboard)
     app.register_blueprint(bp_tutorial)

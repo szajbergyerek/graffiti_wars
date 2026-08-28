@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Dev capture</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #000; }
+  .camera-wrap { position: relative; height: 100dvh; background: #000; overflow: hidden; }
+  .camera-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .camera-shutter-row {
+    position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 28px);
+    display: flex; justify-content: center;
+  }
+  .camera-shutter-btn {
+    width: 72px; height: 72px; border-radius: 999px; background: #fff;
+    border: 4px solid rgba(255, 255, 255, 0.4); cursor: pointer; padding: 0;
+  }
+  .camera-shutter-btn:active { transform: scale(0.92); }
+  .camera-shutter-btn:disabled { opacity: 0.5; }
+  .camera-message {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 16px; text-align: center; padding: 24px; color: #ccc;
+    font-family: -apple-system, sans-serif;
+  }
+  .toast {
+    position: absolute; left: 16px; right: 16px;
+    top: calc(env(safe-area-inset-top) + 16px);
+    background: rgba(19, 19, 25, 0.92); color: #fff;
+    border-radius: 10px; padding: 12px 16px; font-size: 13px; text-align: center;
+    font-family: -apple-system, sans-serif;
+    display: none;
+  }
+  .toast.visible { display: block; }
+</style>
+</head>
+<body>
+<div class="camera-wrap" id="cameraWrap"></div>
+<canvas id="captureCanvas" style="display:none"></canvas>
+<script>
+(() => {
+  const wrap = document.getElementById("cameraWrap");
+  const canvas = document.getElementById("captureCanvas");
+  const uploadUrl = {{ url_for('dev_capture.dev_capture_upload') | tojson }};
+
+  function showMessage(text) {
+    wrap.innerHTML = `<div class="camera-message"><p>${text}</p></div>`;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showMessage("Camera not supported in this browser.");
+    return;
+  }
+  if (!navigator.geolocation) {
+    showMessage("Geolocation not supported in this browser.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => startCamera(position.coords.latitude, position.coords.longitude),
+    () => showMessage("Location permission denied or unavailable."),
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+
+  async function startCamera(lat, lon) {
+    wrap.innerHTML =
+      `<video id="cameraVideo" class="camera-video" autoplay playsinline muted></video>` +
+      `<div class="toast" id="toast"></div>` +
+      `<div class="camera-shutter-row"><button type="button" id="shutterBtn" class="camera-shutter-btn"></button></div>`;
+
+    const video = document.getElementById("cameraVideo");
+    const shutterBtn = document.getElementById("shutterBtn");
+    const toastEl = document.getElementById("toast");
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    } catch (err) {
+      showMessage("Could not access the camera.");
+      return;
+    }
+    video.srcObject = stream;
+
+    let capturing = false;
+    shutterBtn.addEventListener("click", () => {
+      if (capturing) return;
+      capturing = true;
+      shutterBtn.disabled = true;
+
+      const capturedAt = new Date().toISOString();
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append("photo", blob, "capture.jpg");
+        formData.append("lat", lat);
+        formData.append("lon", lon);
+        formData.append("captured_at", capturedAt);
+
+        try {
+          const response = await fetch(uploadUrl, { method: "POST", body: formData });
+          const data = await response.json();
+          toastEl.textContent = data.ok ? `Saved: ${data.filename}` : "Save failed.";
+        } catch (err) {
+          toastEl.textContent = "Save failed.";
+        }
+        toastEl.classList.add("visible");
+        setTimeout(() => toastEl.classList.remove("visible"), 1500);
+
+        capturing = false;
+        shutterBtn.disabled = false;
+      }, "image/jpeg", 0.92);
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -454,6 +454,44 @@ a generic key/value settings system, not one column per value:
   `SettingsService.get()`, then deleted the test override rows so the local
   DB is back on defaults.
 
+## Dev tool: raw geotagged photo capture (`/dev/capture`)
+
+A dev utility (`endpoints/dev_capture.py` + `templates/dev_capture.html`) for
+quickly collecting real geotagged test photos — completely separate from the
+game's tag-submission flow, no `Image`/`TagPoint` rows, no verification, not
+linked from anywhere in the UI (fixed path, but no auth/token gate).
+
+- **First version of this had a secret-token URL** (`/dev/capture/<token>`,
+  gated on a `DEV_CAPTURE_TOKEN` env var) — the user explicitly rejected that
+  as overcomplicated ("mi a faszom a kód... egyetlen publikus egyszerű
+  megnyitható végpont legyen") and it was ripped back out same-session. Don't
+  reintroduce token/env-var gating here unless asked again — the route is now
+  just a plain fixed path, `/dev/capture`, no config needed anywhere, works
+  identically on any deployment the moment the code is live.
+- **Page flow**: on load, requests geolocation first, then — only once a fix
+  succeeds — opens the live camera (`getUserMedia`, same pattern as the tag
+  submission/log pages). Tapping the shutter draws the frame to a canvas,
+  uploads immediately, shows a 1.5s "Saved: <filename>" toast, then the
+  camera stays live for the next shot — deliberately loop-friendly for
+  quickly gathering many test photos in one session, not single-shot.
+- **No verification of any kind** — no distance/proximity check, no teleport
+  check, no auth, no `Image` DB row, no content hashing. This is intentional;
+  it's a raw capture tool, not a game action.
+- **Filename = coordinates + exact capture time**, not content-hash based
+  (unlike every other upload path in this app, which goes through
+  `ImageStorage`'s sha256-hash naming): `{lat:.6f}_{lon:.6f}_{YYYYMMDD_HHMMSS_mmm}.jpg`,
+  e.g. `47.497913_19.040236_20260828_154512_123.jpg`. The timestamp is the
+  client-side moment of the shutter tap (`new Date().toISOString()`, sent as
+  `captured_at`), not server receive time.
+- Saved directly to `assets/images/dev_captures/` (bypasses `ImageStorage`
+  entirely — a plain `photo.save()` to a computed path) — falls under the
+  existing `assets/images/` gitignore rule and is automatically servable via
+  the existing generic `/assets/images/<path:relative_path>` route since
+  that route just does `send_from_directory` on anything under `IMAGES_ROOT`.
+- Verified end-to-end with a real Flask test client: `GET /dev/capture` →
+  200, `POST /dev/capture/upload` → 200 with the file written to disk under
+  the exact expected filename. Test artifact cleaned up after.
+
 ## New feature: tag likes → removed, comments added, description added
 
 Order of events across rounds, in case it matters for git-blame archaeology:
