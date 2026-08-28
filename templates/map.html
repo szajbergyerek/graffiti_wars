@@ -2,17 +2,20 @@
 {% block title %}{{ t('title.map') }} - Graffiti Wars{% endblock %}
 {% block header_title %}{{ t('nav.map') }}{% endblock %}
 {% block header_action %}
-<button type="button" class="app-header-back" id="sheetToggle" aria-label="{{ t('map.sidebar_toggle') }}">
-  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-</button>
+<div style="display:flex; flex-direction:column; gap:8px">
+  <button type="button" class="app-header-back" id="sheetToggle" aria-label="{{ t('map.sidebar_toggle') }}">
+    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+  </button>
+  <a href="{{ url_for('tags.search_tag') }}" class="app-header-back" aria-label="{{ t('tag.search_button') }}">
+    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+  </a>
+</div>
 {% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   .app-content { position: relative; overflow: hidden; }
   #mainMap { width: 100%; height: 100%; }
-  .member-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
-  .member-rank { width: 18px; color: var(--text-faint); font-weight: 700; }
   .mini-band-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
   .mini-band-row:last-child { border-bottom: none; }
   .swatch { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
@@ -28,29 +31,7 @@
   <div class="sheet-handle"></div>
 
   {% if current_user.is_authenticated %}
-    {% if not current_user.is_civilian %}
-    <h4>{{ t('map.your_gang_title') }}</h4>
-    <div class="card mb-24" style="padding:16px">
-      <div class="flex items-center gap-12 mb-16">
-        <div class="tag-swatch avatar" style="width:38px;height:38px;background:{{ current_user.band.color }}"></div>
-        <div>
-          <a href="{{ url_for('bands.band_detail', band_id=current_user.band.id) }}" style="font-weight:700">{{ current_user.band.name }}</a>
-          <div class="text-muted" style="font-size:12px">
-            {{ current_user.band.members | length }} {{ t('common.member') if current_user.band.members | length == 1 else t('common.members') }}
-          </div>
-        </div>
-      </div>
-
-      <h4 style="margin-top:4px">{{ t('map.member_ranking_title') }}</h4>
-      {% for row in member_ranking %}
-      <div class="member-row">
-        <div class="member-rank">{{ loop.index }}</div>
-        <div style="flex:1">{{ row.username }}</div>
-        <div class="text-muted">{{ row.approved_count }}</div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
+    {% if current_user.is_civilian %}
     <div class="card mb-24" style="padding:16px">
       <p class="mb-16">{{ t('map.no_gang_prompt') }}</p>
       <a href="{{ url_for('bands.list_bands') }}" class="btn btn-secondary btn-block btn-sm">{{ t('map.browse_gangs') }}</a>
@@ -71,6 +52,10 @@
 {% block extra_scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+  window.mapUiLabels = {
+    logButton: {{ t('tag.log_button') | tojson }},
+  };
+
   const territoriesByBand = {};
   let visibleBandIds = new Set();
 
@@ -118,6 +103,8 @@
 
   const liveMap = initLiveMap("mainMap", {
     zoom: 13,
+    center: {{ map_center | tojson }} || undefined,
+    zoomControl: false,
     viewportFiltered: true,
     onTerritoriesLoaded: (territories) => {
       territories.forEach((territory) => {
@@ -131,13 +118,11 @@
     },
   });
 
-  const fabEl = document.querySelector(".fab");
   initBottomSheet(
     document.getElementById("sheetToggle"),
     document.getElementById("mapSheet"),
     document.getElementById("sheetBackdrop"),
-    (open) => {
-      if (fabEl) fabEl.style.display = open ? "none" : "";
+    () => {
       setTimeout(() => liveMap && liveMap.invalidateSize(), 260);
     }
   );

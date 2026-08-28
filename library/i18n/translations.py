@@ -82,9 +82,11 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # ---------- Map page ----------
-    "map.leaderboard_title": {"hu": "Toplista", "en": "Leaderboard"},
+    "map.leaderboard_title": {
+        "hu": "Helyi toplista - a képen látható bandák",
+        "en": "Local leaderboard - gangs visible on screen",
+    },
     "map.no_territory": {"hu": "Még nincs terület lefoglalva.", "en": "No territory has been claimed yet."},
-    "map.your_gang_title": {"hu": "Saját bandád", "en": "Your gang"},
     "map.submit_tag_button": {"hu": "+ Tag felvitele", "en": "+ Add a tag"},
     "map.no_gang_prompt": {
         "hu": "Csatlakozz egy bandához, hogy te is területet foglalhass.",
@@ -155,8 +157,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "profile.stat_acceptance_rate": {"hu": "Elfogadási arány", "en": "Acceptance rate"},
     "profile.stat_contribution": {"hu": "Hozzájárulás a bandához", "en": "Contribution to gang"},
     "profile.stat_submitted": {"hu": "Összes beadvány", "en": "Total submissions"},
+    "profile.stat_visited": {"hu": "Meglátogatott tagek", "en": "Visited tags"},
     "profile.recent_title": {"hu": "Legutóbbi beadványok", "en": "Recent submissions"},
+    "profile.visited_title": {"hu": "Meglátogatott tagek", "en": "Visited tags"},
+    "profile.former_gang_divider": {"hu": "Korábbi banda: {band}", "en": "Former gang: {band}"},
     "profile.no_tags_yet": {"hu": "Még nincs beadott tag.", "en": "No tags submitted yet."},
+    "profile.no_visited_yet": {"hu": "Még nincs meglátogatott tag.", "en": "No visited tags yet."},
     "profile.edit_button": {"hu": "Profil szerkesztése", "en": "Edit profile"},
     "profile.my_gang_button": {"hu": "Bandám", "en": "My gang"},
     "profile.message_button": {"hu": "Üzenet küldése", "en": "Send message"},
@@ -243,6 +249,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "hu": "Köszönjük a jelzést, az admin csapat megvizsgálja.",
         "en": "Thanks for the report, the admin team will look into it.",
     },
+    "flash.tag_logged": {"hu": "Tag logolva!", "en": "Tag logged!"},
+    "flash.tag_search_coming_soon": {
+        "hu": "Köszönjük! A keresés funkció hamarosan érkezik.",
+        "en": "Thanks! The search feature is coming soon.",
+    },
+
+    # ---------- Tutorial ----------
+    "tutorial.title": {"hu": "Bemutató", "en": "Tutorial"},
+    "tutorial.close_button": {"hu": "Bezárás", "en": "Close"},
+    "tutorial.step_title": {"hu": "{step}. lépés", "en": "Step {step}"},
+    "tutorial.step_placeholder": {
+        "hu": "A bemutató tartalma hamarosan érkezik.",
+        "en": "Tutorial content coming soon.",
+    },
+    "tutorial.next_button": {"hu": "Tovább", "en": "Next"},
+    "tutorial.finish_button": {"hu": "Kezdjük!", "en": "Let's start!"},
 
     # ---------- Admin flash messages ----------
     "flash.report_closed": {"hu": "Jelentés lezárva.", "en": "Report closed."},
@@ -261,6 +283,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "hu": "Lokáció (kattints a térképre, vagy engedélyezd a helymeghatározást)",
         "en": "Location (click the map, or allow location access)",
     },
+    "tag.field_description": {"hu": "Leírás (opcionális)", "en": "Description (optional)"},
     "tag.submit_button": {"hu": "Tovább", "en": "Continue"},
     "tag.upload_help": {
         "hu": "A fotónak most, a helyszínen készültnek kell lennie - ne tölts fel régebbi képet.",
@@ -293,11 +316,26 @@ STRINGS: dict[str, dict[str, str]] = {
     "tag.report_reason_not_tag": {"hu": "Nem tag", "en": "Not a tag"},
     "tag.report_reason_missing": {"hu": "Nincs is ott", "en": "It's not there"},
     "tag.report_reason_cheating": {"hu": "Csalás történt", "en": "Cheating occurred"},
-    "tag.like_button": {"hu": "Tetszik", "en": "Like"},
     "tag.comments_title": {"hu": "Hozzászólások", "en": "Comments"},
     "tag.comment_placeholder": {"hu": "Írj hozzászólást...", "en": "Write a comment..."},
     "tag.comment_send": {"hu": "Küldés", "en": "Post"},
     "tag.no_comments_yet": {"hu": "Még nincs hozzászólás.", "en": "No comments yet."},
+    "tag.log_button": {"hu": "Logolás", "en": "Log"},
+    "tag.log_title": {"hu": "Tag logolása", "en": "Log this tag"},
+    "tag.log_help": {
+        "hu": "Töltsd fel a saját fotódat, amivel igazolod, hogy jártál itt.",
+        "en": "Upload your own photo to confirm you were here.",
+    },
+    "tag.log_field_photo": {"hu": "Fénykép a helyszínről", "en": "Photo of the spot"},
+    "tag.log_submit_button": {"hu": "Logolás", "en": "Log it"},
+    "tag.search_button": {"hu": "Tag keresése", "en": "Search a tag"},
+    "tag.search_title": {"hu": "Melyik bandáé ez a tag?", "en": "Whose tag is this?"},
+    "tag.search_help": {
+        "hu": "Tölts fel egy fotót egy tagről, és megkeressük, melyik banda taggelte.",
+        "en": "Upload a photo of a tag and we'll figure out which gang made it.",
+    },
+    "tag.search_field_photo": {"hu": "Fénykép a tagről", "en": "Photo of the tag"},
+    "tag.search_submit_button": {"hu": "Keresés", "en": "Search"},
 
     # ---------- Admin panel ----------
     "admin.nav_queue": {"hu": "Várólista", "en": "Queue"},
@@ -354,6 +392,15 @@ STRINGS: dict[str, dict[str, str]] = {
     "chat.preview_image": {"hu": "\U0001F4F7 Kép", "en": "\U0001F4F7 Photo"},
     "chat.preview_location": {"hu": "\U0001F4CD Helyzet", "en": "\U0001F4CD Location"},
     "chat.preview_poll": {"hu": "\U0001F4CA Szavazás", "en": "\U0001F4CA Poll"},
+    "chat.system_tag_captured": {
+        "hu": "{username} elfoglalt egy új területet egy taggel!",
+        "en": "{username} captured new territory with a tag!",
+    },
+    "chat.system_tag_reinforced": {
+        "hu": "{username} tagelt a banda már meglévő területén.",
+        "en": "{username} tagged within the gang's existing territory.",
+    },
+    "chat.view_tag_link": {"hu": "Tag megtekintése", "en": "View tag"},
 
     # ---------- Leaderboard page ----------
     "leaderboard.tab_global": {"hu": "Globális", "en": "Global"},
@@ -414,7 +461,6 @@ STRINGS: dict[str, dict[str, str]] = {
     },
 
     # ---------- Map sidebar ----------
-    "map.member_ranking_title": {"hu": "Tagok ranglistája", "en": "Member ranking"},
     "map.sidebar_toggle": {"hu": "Banda infó és toplista", "en": "Crew info & leaderboard"},
 
     # ---------- Landmarks ----------

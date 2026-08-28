@@ -7,12 +7,14 @@ from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from library.extensions import db
+from library.models.chat_message import ChatMessage
+from library.models.conversation import Conversation
 from library.models.image import Image
 from library.models.news_feed_event import NewsFeedEvent
 from library.models.tag_comment import TagComment
-from library.models.tag_like import TagLike
 from library.models.tag_point import TagPoint
 from library.models.tag_report import TagReport
+from library.models.tag_visit import TagVisit
 from library.services.exif_extractor import ExifExtractor
 from library.services.image_storage import ImageStorage
 from library.services.landmark_service import LandmarkService
@@ -29,24 +31,16 @@ logger = logging.getLogger("tag_submission")
 
 @bp_tags.route("/map")
 def map_view():
-    member_ranking = []
+    map_center = None
     if current_user.is_authenticated and not current_user.is_civilian:
-        members = sorted(current_user.band.members, key=lambda member: member.username.lower())
-        member_ranking = sorted(
-            (
-                {
-                    "username": member.username,
-                    "approved_count": TagPoint.query.filter_by(
-                        band_id=current_user.band_id, submitted_by_id=member.id, status="approved"
-                    ).count(),
-                }
-                for member in members
-            ),
-            key=lambda row: row["approved_count"],
-            reverse=True,
-        )
+        own_points = TagPoint.query.filter_by(band_id=current_user.band_id, status="approved").all()
+        if own_points:
+            map_center = [
+                sum(p.lat for p in own_points) / len(own_points),
+                sum(p.lon for p in own_points) / len(own_points),
+            ]
 
-    return render_template("map.html", member_ranking=member_ranking)
+    return render_template("map.html", map_center=map_center)
 
 
 def _get_own_pending_image(image_id: int) -> Image:
@@ -68,6 +62,7 @@ def submit_tag():
     if request.method == "POST":
         photo = request.files.get("photo")
         client_now_raw = request.form.get("client_now")
+        description = request.form.get("description", "").strip()[:500]
 
         if photo is None or photo.filename == "" or not client_now_raw:
             flash(t("flash.tag_missing_fields"), "error")
@@ -111,10 +106,11 @@ def submit_tag():
                     image_id=image.id,
                     lat=metadata["gps_lat"],
                     lon=metadata["gps_lon"],
+                    description=description,
                 )
             )
 
-        return redirect(url_for("tags.locate", image_id=image.id))
+        return redirect(url_for("tags.locate", image_id=image.id, description=description))
 
     return render_template("tag_submit_upload.html")
 
@@ -123,12 +119,13 @@ def submit_tag():
 @login_required
 def locate():
     image_id = request.args.get("image_id", type=int)
+    description = request.args.get("description", "")
     try:
         _get_own_pending_image(image_id)
     except (PermissionError, ValueError):
         return redirect(url_for("tags.submit_tag"))
 
-    return render_template("tag_submit_locate.html", image_id=image_id)
+    return render_template("tag_submit_locate.html", image_id=image_id, description=description)
 
 
 @bp_tags.route("/tags/submit/cancel", methods=["POST"])
@@ -150,6 +147,7 @@ def processing():
     image_id = request.args.get("image_id", type=int)
     lat = request.args.get("lat", type=float)
     lon = request.args.get("lon", type=float)
+    description = request.args.get("description", "")
     try:
         _get_own_pending_image(image_id)
     except (PermissionError, ValueError):
@@ -157,7 +155,9 @@ def processing():
     if lat is None or lon is None:
         return redirect(url_for("tags.submit_tag"))
 
-    return render_template("tag_submit_processing.html", image_id=image_id, lat=lat, lon=lon)
+    return render_template(
+        "tag_submit_processing.html", image_id=image_id, lat=lat, lon=lon, description=description
+    )
 
 
 @bp_tags.route("/tags/submit/finalize", methods=["POST"])
@@ -166,6 +166,7 @@ def finalize():
     image_id = request.form.get("image_id", type=int)
     lat = request.form.get("lat", type=float)
     lon = request.form.get("lon", type=float)
+    description = request.form.get("description", "").strip()[:500]
 
     try:
         image = _get_own_pending_image(image_id)
@@ -185,6 +186,7 @@ def finalize():
         lat=lat,
         lon=lon,
         status="approved",
+        description=description or None,
         ai_confidence=None,
     )
     db.session.add(tag_point)
@@ -199,6 +201,24 @@ def finalize():
             message=t("feed.tag_approved", band=current_user.band.name, username=current_user.username),
         )
     )
+
+    band_conversation = Conversation.query.filter_by(kind="band", band_id=current_user.band_id).first()
+    if band_conversation is not None:
+        captured_new_ground = (tag_point.area_added_km2 or 0.0) > 0
+        system_text = t(
+            "chat.system_tag_captured" if captured_new_ground else "chat.system_tag_reinforced",
+            username=current_user.username,
+        )
+        db.session.add(
+            ChatMessage(
+                conversation_id=band_conversation.id,
+                sender_id=current_user.id,
+                body=system_text,
+                message_type="tag_added",
+                tag_point_id=tag_point.id,
+            )
+        )
+
     db.session.commit()
 
     return jsonify({"redirect_url": url_for("tags.map_view")})
@@ -210,35 +230,11 @@ def tag_detail(tag_id: int):
         joinedload(TagPoint.submitted_by), joinedload(TagPoint.band), joinedload(TagPoint.photo_image)
     ).get_or_404(tag_id)
     area_added_km2 = tag_point.area_added_km2 or 0.0
-    like_count = TagLike.query.filter_by(tag_point_id=tag_id).count()
-    is_liked_by_me = (
-        current_user.is_authenticated
-        and TagLike.query.filter_by(tag_point_id=tag_id, user_id=current_user.id).first() is not None
-    )
     return render_template(
         "tag_detail.html",
         tag_point=tag_point,
         area_added_km2=area_added_km2,
-        like_count=like_count,
-        is_liked_by_me=is_liked_by_me,
     )
-
-
-@bp_tags.route("/tags/<int:tag_id>/like", methods=["POST"])
-@login_required
-def toggle_like(tag_id: int):
-    TagPoint.query.get_or_404(tag_id)
-    existing = TagLike.query.filter_by(tag_point_id=tag_id, user_id=current_user.id).first()
-    if existing is not None:
-        db.session.delete(existing)
-        liked = False
-    else:
-        db.session.add(TagLike(tag_point_id=tag_id, user_id=current_user.id))
-        liked = True
-    db.session.commit()
-
-    like_count = TagLike.query.filter_by(tag_point_id=tag_id).count()
-    return jsonify({"liked": liked, "like_count": like_count})
 
 
 @bp_tags.route("/api/tags/<int:tag_id>/comments")
@@ -301,3 +297,56 @@ def report_tag(tag_id: int):
 
     flash(t("flash.report_thanks"), "success")
     return redirect(url_for("tags.map_view"))
+
+
+@bp_tags.route("/tags/<int:tag_id>/log", methods=["GET", "POST"])
+@login_required
+def log_visit(tag_id: int):
+    tag_point = TagPoint.query.options(joinedload(TagPoint.band), joinedload(TagPoint.photo_image)).get_or_404(
+        tag_id
+    )
+
+    if request.method == "POST":
+        photo = request.files.get("photo")
+        if photo is None or photo.filename == "":
+            flash(t("flash.tag_missing_fields"), "error")
+            return render_template("tag_log_upload.html", tag_point=tag_point)
+
+        storage = ImageStorage(current_app.config["IMAGES_ROOT"])
+        try:
+            image = storage.save(photo, "tag_visits", uploaded_by_id=current_user.id)
+        except ValueError:
+            flash(t("flash.unsupported_image"), "error")
+            return render_template("tag_log_upload.html", tag_point=tag_point)
+
+        # Real photo/location matching against the tag isn't ready yet - every log is accepted for now.
+        db.session.add(TagVisit(tag_point_id=tag_point.id, visitor_id=current_user.id, photo_image_id=image.id))
+        db.session.commit()
+
+        flash(t("flash.tag_logged"), "success")
+        return redirect(url_for("tags.tag_detail", tag_id=tag_point.id))
+
+    return render_template("tag_log_upload.html", tag_point=tag_point)
+
+
+@bp_tags.route("/tags/search", methods=["GET", "POST"])
+@login_required
+def search_tag():
+    if request.method == "POST":
+        photo = request.files.get("photo")
+        if photo is None or photo.filename == "":
+            flash(t("flash.tag_missing_fields"), "error")
+            return render_template("tag_search_upload.html")
+
+        storage = ImageStorage(current_app.config["IMAGES_ROOT"])
+        try:
+            storage.save(photo, "tag_searches", uploaded_by_id=current_user.id)
+        except ValueError:
+            flash(t("flash.unsupported_image"), "error")
+            return render_template("tag_search_upload.html")
+
+        # The actual band-matching search isn't implemented yet - just accept the photo for now.
+        flash(t("flash.tag_search_coming_soon"), "success")
+        return redirect(url_for("tags.map_view"))
+
+    return render_template("tag_search_upload.html")

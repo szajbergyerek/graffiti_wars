@@ -42,13 +42,7 @@
 
     <div class="field">
       <label>{{ t('band.field_color') }}</label>
-      <div class="color-swatch-picker">
-        {% for color in colors %}
-        <label class="color-swatch" style="background:{{ color }}">
-          <input type="radio" name="color" value="{{ color }}" {{ "checked" if band.color == color else "" }} />
-        </label>
-        {% endfor %}
-      </div>
+      <input type="color" name="color" value="{{ band.color }}" class="color-input" />
     </div>
 
     <div class="field">

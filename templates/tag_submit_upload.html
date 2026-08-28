@@ -20,6 +20,10 @@
       <input type="file" id="tagPhotoInput" name="photo" accept="image/*" capture="environment" required class="sr-only" />
       <p style="font-size:12px; margin-top:6px">{{ t('tag.upload_help') }}</p>
     </div>
+    <div class="field mb-24">
+      <label>{{ t('tag.field_description') }}</label>
+      <textarea name="description" rows="3" maxlength="500"></textarea>
+    </div>
     <input type="hidden" name="client_now" id="clientNow" />
     <button type="submit" class="btn btn-primary btn-block">{{ t('tag.submit_button') }}</button>
   </form>

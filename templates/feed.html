@@ -1,14 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ t('title.feed') }} - Graffiti Wars{% endblock %}
-{% block header_nav %}
-<a href="{{ url_for('profile.my_profile') }}" class="app-header-back">
-  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-</a>
-{% endblock %}
 {% block header_title %}{{ t('nav.feed') }}{% endblock %}
 {% block content %}
-<div class="container section section-with-header-buttons" style="max-width:640px">
-  <div class="card" id="feedList" style="padding:0"></div>
+<div class="container section" style="max-width:520px; padding-top:56px">
+  <div id="feedList"></div>
 </div>
 {% endblock %}
 {% block extra_scripts %}
@@ -17,33 +12,28 @@
     container: document.getElementById("feedList"),
     emptyMessage: {{ t('home.feed_empty') | tojson }},
     fetchPage: (offset, limit) => fetch(`/api/feed?offset=${offset}&limit=${limit}`).then((r) => r.json()),
-    renderItem: (event) => {
-      const row = document.createElement("div");
-      row.className = "flex items-center gap-12";
-      row.style.padding = "16px";
-      row.style.borderBottom = "1px solid var(--border)";
+    renderItem: (tag) => {
+      const card = document.createElement("a");
+      card.href = `/tags/${tag.id}`;
+      card.className = "card feed-card mb-24";
+      card.style.padding = "0";
+      card.style.display = "block";
 
-      const dot = document.createElement("div");
-      dot.style.width = "8px";
-      dot.style.height = "8px";
-      dot.style.borderRadius = "50%";
-      dot.style.flexShrink = "0";
-      dot.style.background = event.color || "var(--purple)";
-
-      const info = document.createElement("div");
-      info.style.flex = "1";
-      const message = document.createElement("div");
-      message.textContent = event.message;
-      const time = document.createElement("div");
-      time.className = "text-muted";
-      time.style.fontSize = "13px";
-      time.textContent = event.created_at;
-      info.appendChild(message);
-      info.appendChild(time);
-
-      row.appendChild(dot);
-      row.appendChild(info);
-      return row;
+      card.innerHTML = `
+        <div class="feed-card-header">
+          <img class="avatar" src="${escapeHtml(tag.avatar_url)}" width="36" height="36" />
+          <div class="feed-card-header-text">
+            <div style="font-weight:700">${escapeHtml(tag.username)}</div>
+            <div style="font-size:12px; color:${escapeHtml(tag.band_color)}">${escapeHtml(tag.band_name)}</div>
+          </div>
+        </div>
+        <img class="feed-card-photo" src="${escapeHtml(tag.photo_url)}" />
+        <div class="feed-card-footer">
+          <span class="text-muted" style="font-size:12px">${tag.lat.toFixed(4)}, ${tag.lon.toFixed(4)}</span>
+          <span class="text-muted" style="font-size:12px">${escapeHtml(tag.created_at)}</span>
+        </div>
+      `;
+      return card;
     },
   });
 </script>

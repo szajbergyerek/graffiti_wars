@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
@@ -22,6 +23,8 @@ from library.services.leaderboard_service import LeaderboardService
 from library.services.territory_engine import TerritoryEngine
 from library.services.translator import t
 from library.services.username_validator import UsernameValidator
+
+HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 bp_bands = Blueprint("bands", __name__, url_prefix="/bands")
 chat_service = ChatService()
@@ -116,8 +119,8 @@ def create_band():
         join_policy = request.form.get("join_policy", "open")
         if join_policy not in JOIN_POLICIES:
             join_policy = "open"
-        color = request.form.get("color")
-        if color not in BAND_COLOR_PALETTE:
+        color = request.form.get("color", "")
+        if not HEX_COLOR_PATTERN.match(color):
             color = Band.next_color(Band.query.count())
         nationality_code = request.form.get("nationality_code") or None
         if nationality_code and nationality_code not in COUNTRY_BY_CODE:
@@ -126,18 +129,18 @@ def create_band():
 
         if not name or reference_image is None or reference_image.filename == "":
             flash(t("flash.band_missing_fields"), "error")
-            return render_template("band_create.html", countries=COUNTRIES, colors=BAND_COLOR_PALETTE)
+            return render_template("band_create.html", countries=COUNTRIES)
 
         if Band.query.filter_by(name=name).first():
             flash(t("flash.band_name_taken"), "error")
-            return render_template("band_create.html", countries=COUNTRIES, colors=BAND_COLOR_PALETTE)
+            return render_template("band_create.html", countries=COUNTRIES)
 
         storage = ImageStorage(current_app.config["IMAGES_ROOT"])
         try:
             image = storage.save(reference_image, "tags", uploaded_by_id=current_user.id)
         except ValueError:
             flash(t("flash.unsupported_image"), "error")
-            return render_template("band_create.html", countries=COUNTRIES, colors=BAND_COLOR_PALETTE)
+            return render_template("band_create.html", countries=COUNTRIES)
 
         band = Band(
             name=name,
@@ -165,7 +168,7 @@ def create_band():
         flash(t("flash.band_created"), "success")
         return redirect(url_for("bands.band_detail", band_id=band.id))
 
-    return render_template("band_create.html", countries=COUNTRIES, colors=BAND_COLOR_PALETTE)
+    return render_template("band_create.html", countries=COUNTRIES)
 
 
 @bp_bands.route("/<int:band_id>")
@@ -440,8 +443,8 @@ def band_settings(band_id: int):
         nationality_code = request.form.get("nationality_code") or None
         if nationality_code and nationality_code not in COUNTRY_BY_CODE:
             nationality_code = None
-        color = request.form.get("color")
-        if color not in BAND_COLOR_PALETTE:
+        color = request.form.get("color", "")
+        if not HEX_COLOR_PATTERN.match(color):
             color = band.color
 
         storage = ImageStorage(current_app.config["IMAGES_ROOT"])
@@ -452,7 +455,7 @@ def band_settings(band_id: int):
                 image = storage.save(reference_image, "tags", uploaded_by_id=current_user.id)
             except ValueError:
                 flash(t("flash.unsupported_image"), "error")
-                return render_template("band_settings.html", band=band, countries=COUNTRIES, colors=BAND_COLOR_PALETTE)
+                return render_template("band_settings.html", band=band, countries=COUNTRIES)
             band.reference_image_id = image.id
 
         banner_image = request.files.get("banner")
@@ -461,7 +464,7 @@ def band_settings(band_id: int):
                 image = storage.save(banner_image, "tags", uploaded_by_id=current_user.id)
             except ValueError:
                 flash(t("flash.unsupported_image"), "error")
-                return render_template("band_settings.html", band=band, countries=COUNTRIES, colors=BAND_COLOR_PALETTE)
+                return render_template("band_settings.html", band=band, countries=COUNTRIES)
             band.banner_image_id = image.id
 
         band.description = description
@@ -473,7 +476,7 @@ def band_settings(band_id: int):
         flash(t("flash.band_settings_updated"), "success")
         return redirect(url_for("bands.band_detail", band_id=band.id))
 
-    return render_template("band_settings.html", band=band, countries=COUNTRIES, colors=BAND_COLOR_PALETTE)
+    return render_template("band_settings.html", band=band, countries=COUNTRIES)
 
 
 @bp_bands.route("/<int:band_id>/members/<int:user_id>/kick", methods=["POST"])

@@ -22,6 +22,12 @@ function initInfiniteList(options) {
   let firstLoad = true;
   let destroyed = false;
 
+  const spinner = document.createElement("div");
+  spinner.className = "infinite-scroll-spinner";
+  spinner.innerHTML = '<div class="infinite-scroll-spinner-icon"></div>';
+  spinner.style.display = "none";
+  container.insertAdjacentElement("afterend", spinner);
+
   function currentScrollMetrics() {
     if (scrollParent) {
       return { top: scrollParent.scrollTop, height: scrollParent.scrollHeight, client: scrollParent.clientHeight };
@@ -36,10 +42,12 @@ function initInfiniteList(options) {
   function loadNext() {
     if (loading || exhausted || destroyed) return;
     loading = true;
+    spinner.style.display = "flex";
 
     fetchPage(offset, pageSize)
       .then((items) => {
         loading = false;
+        spinner.style.display = "none";
         if (destroyed) return;
 
         if (firstLoad) {
@@ -67,6 +75,7 @@ function initInfiniteList(options) {
       })
       .catch(() => {
         loading = false;
+        spinner.style.display = "none";
         exhausted = true;
       });
   }
@@ -92,6 +101,7 @@ function initInfiniteList(options) {
     destroy: () => {
       destroyed = true;
       scrollTarget.removeEventListener("scroll", checkScroll);
+      spinner.remove();
     },
   };
 }
@@ -189,7 +199,7 @@ function initLiveMap(elementId, options = {}) {
   if (!el || typeof L === "undefined") return null;
 
   const map = L.map(elementId, {
-    zoomControl: options.interactive !== false,
+    zoomControl: options.zoomControl !== undefined ? options.zoomControl : options.interactive !== false,
     scrollWheelZoom: options.interactive !== false,
     dragging: options.interactive !== false,
     doubleClickZoom: options.interactive !== false,
@@ -216,10 +226,12 @@ function initLiveMap(elementId, options = {}) {
     const p = feature.properties;
     const [lon, lat] = feature.geometry.coordinates;
     const marker = L.marker([lat, lon], { icon: bandPinIcon(p.color) });
+    const logLabel = (window.mapUiLabels && window.mapUiLabels.logButton) || "Log";
     marker.bindPopup(
       `<a href="/users/${encodeURIComponent(p.submitted_by)}" style="font-weight:700; display:block">${escapeHtml(p.submitted_by)}</a>` +
         `<a href="/bands/${p.band_id}" style="color:${escapeHtml(p.color)}; display:block; font-size:12px">${escapeHtml(p.band_name)}</a>` +
-        `<a href="/tags/${p.id}"><img src="${escapeHtml(p.photo_url)}" style="width:190px;border-radius:6px;margin-top:6px" /></a>`
+        `<a href="/tags/${p.id}"><img src="${escapeHtml(p.photo_url)}" style="width:190px;border-radius:6px;margin-top:6px" /></a>` +
+        `<a href="/tags/${p.id}/log" class="btn btn-secondary btn-sm btn-block" style="margin-top:8px">${escapeHtml(logLabel)}</a>`
     );
     return marker;
   }
@@ -389,6 +401,28 @@ function buildChatBubbleBody(message) {
     wrap.appendChild(link);
   } else if (message.message_type === "poll" && message.poll) {
     wrap.appendChild(renderPollWidget(message.poll));
+  } else if (message.message_type === "tag_added" && message.tag_id) {
+    const text = document.createElement("div");
+    text.textContent = message.body;
+    text.style.marginBottom = "6px";
+    wrap.appendChild(text);
+
+    const link = document.createElement("a");
+    link.href = `/tags/${message.tag_id}`;
+    link.style.display = "flex";
+    link.style.alignItems = "center";
+    link.style.gap = "8px";
+    link.style.fontWeight = "700";
+    if (message.tag_photo_url) {
+      const thumb = document.createElement("img");
+      thumb.src = message.tag_photo_url;
+      thumb.style.cssText = "width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0";
+      link.appendChild(thumb);
+    }
+    const label = document.createElement("span");
+    label.textContent = labels.viewTag || "View tag";
+    link.appendChild(label);
+    wrap.appendChild(link);
   } else {
     wrap.textContent = message.body;
   }
@@ -565,40 +599,4 @@ document.addEventListener("DOMContentLoaded", () => {
       if (filenameEl) filenameEl.textContent = input.files[0] ? input.files[0].name : "";
     });
   });
-
-  const unreadBadge = document.getElementById("unreadBadge");
-  if (unreadBadge) {
-    const UNREAD_POLL_MS = 30000;
-    let unreadInterval = null;
-
-    const refreshUnreadBadge = () => {
-      fetch("/api/chat/unread-count")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (!data) return;
-          unreadBadge.textContent = data.count;
-          unreadBadge.style.display = data.count > 0 ? "" : "none";
-        })
-        .catch(() => {});
-    };
-
-    // Only poll while the tab is actually visible - a background tab (very
-    // common for a site left open) shouldn't keep hammering the server.
-    const startPolling = () => {
-      if (unreadInterval) return;
-      refreshUnreadBadge();
-      unreadInterval = setInterval(refreshUnreadBadge, UNREAD_POLL_MS);
-    };
-    const stopPolling = () => {
-      clearInterval(unreadInterval);
-      unreadInterval = null;
-    };
-
-    if (document.visibilityState === "visible") startPolling();
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") startPolling();
-      else stopPolling();
-    });
-    window.addEventListener("beforeunload", stopPolling);
-  }
 });

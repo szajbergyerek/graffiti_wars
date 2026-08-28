@@ -61,6 +61,9 @@ def _serialize_message(message: ChatMessage) -> dict:
         data["lon"] = message.lon
     elif message.message_type == "poll" and message.poll:
         data["poll"] = _serialize_poll(message.poll)
+    elif message.message_type == "tag_added" and message.tag_point:
+        data["tag_id"] = message.tag_point.id
+        data["tag_photo_url"] = message.tag_point.photo_image.url if message.tag_point.photo_image else None
     return data
 
 
@@ -101,12 +104,6 @@ def _inbox_items() -> list:
 @login_required
 def inbox():
     return render_template("chat_inbox.html")
-
-
-@bp_chat.route("/api/chat/unread-count")
-@login_required
-def api_unread_count():
-    return jsonify({"count": chat_service.unread_count(current_user)})
 
 
 @bp_chat.route("/api/chat/inbox")

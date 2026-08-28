@@ -1,9 +1,11 @@
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 
 from library.extensions import db
 from library.i18n.countries import COUNTRIES, COUNTRY_BY_CODE
 from library.models.tag_point import TagPoint
+from library.models.tag_visit import TagVisit
 from library.models.user import User
 from library.services.image_storage import ImageStorage
 from library.services.translator import t
@@ -19,13 +21,21 @@ def _build_profile_context(user: User) -> dict:
 
     contribution_percent = 0.0
     if user.band_id:
+        approved_in_current_band = TagPoint.query.filter_by(
+            submitted_by_id=user.id, band_id=user.band_id, status="approved"
+        ).count()
         band_total = TagPoint.query.filter_by(band_id=user.band_id, status="approved").count()
         if band_total:
-            contribution_percent = round((approved / band_total) * 100, 1)
+            contribution_percent = round((approved_in_current_band / band_total) * 100, 1)
 
     recent_tags = (
-        TagPoint.query.filter_by(submitted_by_id=user.id).order_by(TagPoint.created_at.desc()).limit(6).all()
+        TagPoint.query.filter_by(submitted_by_id=user.id)
+        .options(joinedload(TagPoint.band))
+        .order_by(TagPoint.created_at.desc())
+        .limit(6)
+        .all()
     )
+    visited_count = TagVisit.query.filter_by(visitor_id=user.id).count()
 
     return {
         "profile_user": user,
@@ -33,6 +43,7 @@ def _build_profile_context(user: User) -> dict:
         "approved": approved,
         "contribution_percent": contribution_percent,
         "recent_tags": recent_tags,
+        "visited_count": visited_count,
     }
 
 
@@ -49,6 +60,36 @@ def user_profile(username: str):
     if user is None:
         abort(404)
     return render_template("profile.html", is_own_profile=False, **_build_profile_context(user))
+
+
+@bp_profile.route("/api/users/<username>/visited-tags")
+def visited_tags_api(username: str):
+    user = User.query.filter_by(username=username).first_or_404()
+    offset = request.args.get("offset", type=int, default=0)
+    limit = min(request.args.get("limit", type=int, default=10), 50)
+
+    visits = (
+        TagVisit.query.filter_by(visitor_id=user.id)
+        .options(joinedload(TagVisit.tag_point).joinedload(TagPoint.band))
+        .options(joinedload(TagVisit.tag_point).joinedload(TagPoint.photo_image))
+        .order_by(TagVisit.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    return jsonify(
+        [
+            {
+                "tag_id": visit.tag_point.id,
+                "photo_url": visit.tag_point.photo_image.url if visit.tag_point.photo_image else None,
+                "band_name": visit.tag_point.band.name,
+                "band_color": visit.tag_point.band.color,
+                "visited_at": visit.created_at.strftime("%Y.%m.%d %H:%M"),
+            }
+            for visit in visits
+        ]
+    )
 
 
 @bp_profile.route("/profile/edit", methods=["GET", "POST"])

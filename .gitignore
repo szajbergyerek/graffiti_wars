@@ -30,3 +30,5 @@ Thumbs.db
 # User-uploaded content
 static/uploads/
 assets/images/
+dev_motes.md
+dev_notes.md

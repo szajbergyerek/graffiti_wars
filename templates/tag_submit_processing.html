@@ -29,7 +29,7 @@
     fetch({{ url_for('tags.finalize') | tojson }}, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `image_id=${encodeURIComponent({{ image_id | tojson }})}&lat=${encodeURIComponent({{ lat | tojson }})}&lon=${encodeURIComponent({{ lon | tojson }})}`,
+      body: `image_id=${encodeURIComponent({{ image_id | tojson }})}&lat=${encodeURIComponent({{ lat | tojson }})}&lon=${encodeURIComponent({{ lon | tojson }})}&description=${encodeURIComponent({{ description | tojson }})}`,
     })
       .then((r) => r.json())
       .then((data) => {

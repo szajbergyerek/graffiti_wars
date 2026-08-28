@@ -1,9 +1,0 @@
-- teljesen újragondoltam a fedd szekciót. nem kell ilyen feed hogy mi történik. a leaderboard menüpont le ne alul legyen egy menüpont, hanem csak egy nagy gomb a gangs oldal tetején. az alsó menüsorban legyen a leaderboard gomb helyén a feed gomb. mostantól a feed csak a tageket tartlmazza hogy ki mikor mikor mit hol tagelt egy listában. legyen olyan mint egy instagram feed.
-- a map nézete ott nyíljon meg ahol az adott ember gangje van.
-- a tékép jobb felső sarkában lévő gomb ugye megnyitja a lokális leaderboardot - ezen a saját gang ne legyen rata, hanem csak az épp látható gangek rangsora. ne csak leaderboard legyen odaírva, hanem legyen egyértelmű hogy ez csak a képen éppen látható helyi bandák leaderodja a cim alapjan.
-- mégsincs szükség az üzenet értesítésre és a kis jelzésre ha jött egy. ezt a rész töröld. a profilon már ne legyen feed gomb mert ez átkerült máshova
-- a gang csoportba érkezzen egy rendszer üzenet ha valaki új taget vitt fel (kattintható és megtekinthető legyen). azt írja a chatbe a rendszer ha valaki elfoglalt vagy a területükre tagelt.
-- miért írja most az openstreetmap térkép vízjellel mindenhol hogy api key required?
-- a megjelő tooltipkre sehol sem x bezárás gomb a jobb felső rakába. (ha elkattintok máshova róla úgyis eltűnik)
-- Members and contribution táblázat minden eleme legyen középre igazítva
-- egy gang oldalának nézetében nincs ott a +tag gomb. jelenjen meg itt is

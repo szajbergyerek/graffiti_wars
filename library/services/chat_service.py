@@ -150,23 +150,3 @@ class ChatService:
         if participant.last_read_message_id is None or latest.id > participant.last_read_message_id:
             participant.last_read_message_id = latest.id
             db.session.commit()
-
-    def unread_count(self, user: User) -> int:
-        """
-        Count how many messages sent by other people are unread across all of a user's conversations.
-
-        param user: The user to count unread messages for.
-
-        :return: The total unread message count.
-        """
-        total = 0
-        participants = ConversationParticipant.query.filter_by(user_id=user.id).all()
-        for participant in participants:
-            query = ChatMessage.query.filter(
-                ChatMessage.conversation_id == participant.conversation_id,
-                ChatMessage.sender_id != user.id,
-            )
-            if participant.last_read_message_id is not None:
-                query = query.filter(ChatMessage.id > participant.last_read_message_id)
-            total += query.count()
-        return total

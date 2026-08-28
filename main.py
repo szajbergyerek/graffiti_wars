@@ -15,9 +15,11 @@ from endpoints.leaderboard import bp_leaderboard
 from endpoints.map_api import bp_map_api
 from endpoints.profile import bp_profile
 from endpoints.tags import bp_tags
+from endpoints.tutorial import bp_tutorial
 from library.config import Config
 from library.extensions import db, login_manager, oauth
 from library.i18n.countries import COUNTRY_BY_CODE
+from library.services.color_utils import contrast_shade, hex_to_rgba
 from library.services.translator import t, translator
 
 load_dotenv()
@@ -55,17 +57,8 @@ def create_app() -> Flask:
 
     app.jinja_env.globals["t"] = t
     app.jinja_env.globals["country_by_code"] = COUNTRY_BY_CODE
-
-    def _unread_chat_count() -> int:
-        from flask_login import current_user
-
-        if not current_user.is_authenticated:
-            return 0
-        from library.services.chat_service import ChatService
-
-        return ChatService().unread_count(current_user)
-
-    app.jinja_env.globals["unread_chat_count"] = _unread_chat_count
+    app.jinja_env.globals["contrast_shade"] = contrast_shade
+    app.jinja_env.globals["hex_to_rgba"] = hex_to_rgba
 
     @app.before_request
     def _resolve_locale():
@@ -82,6 +75,7 @@ def create_app() -> Flask:
     app.register_blueprint(bp_chat)
     app.register_blueprint(bp_feed)
     app.register_blueprint(bp_leaderboard)
+    app.register_blueprint(bp_tutorial)
 
     with app.app_context():
         from library.models.admin_action import AdminAction
@@ -98,9 +92,9 @@ def create_app() -> Flask:
         from library.models.poll_option import PollOption
         from library.models.poll_vote import PollVote
         from library.models.tag_comment import TagComment
-        from library.models.tag_like import TagLike
         from library.models.tag_point import TagPoint
         from library.models.tag_report import TagReport
+        from library.models.tag_visit import TagVisit
         from library.models.user import User
 
         db.create_all()
