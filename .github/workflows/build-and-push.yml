@@ -1,4 +1,4 @@
-name: Build and push Docker image
+name: Build, push, and deploy
 
 on:
   push:
@@ -38,3 +38,26 @@ jobs:
             ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install WireGuard
+        run: sudo apt-get update && sudo apt-get install -y wireguard openresolv
+
+      - name: Write WireGuard config
+        run: |
+          umask 077
+          echo "${{ secrets.WG_CONFIG }}" > wg0.conf
+          sudo mv wg0.conf /etc/wireguard/wg0.conf
+
+      - name: Bring up WireGuard tunnel
+        run: sudo wg-quick up wg0
+
+      - name: Trigger Portainer redeploy
+        run: curl -fsS -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
+
+      - name: Bring down WireGuard tunnel
+        if: always()
+        run: sudo wg-quick down wg0 || true
