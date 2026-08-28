@@ -11,13 +11,12 @@ from library.models.poll_vote import PollVote
 from library.models.user import User
 from library.services.chat_service import ChatService
 from library.services.image_storage import ImageStorage
+from library.services.settings_service import SettingsService
 from library.services.translator import t
 
 bp_chat = Blueprint("chat", __name__)
 chat_service = ChatService()
-
-MAX_POLL_OPTIONS = 4
-MIN_POLL_OPTIONS = 2
+settings_service = SettingsService()
 
 
 def _serialize_poll(poll: Poll) -> dict:
@@ -254,9 +253,9 @@ def create_poll(conversation_id: int):
 
     question = request.form.get("question", "").strip()[:200]
     options = [opt.strip()[:100] for opt in request.form.getlist("option") if opt.strip()]
-    if not question or len(options) < MIN_POLL_OPTIONS:
+    if not question or len(options) < settings_service.get_int("poll_min_options"):
         return jsonify({"error": "invalid_poll"}), 400
-    options = options[:MAX_POLL_OPTIONS]
+    options = options[: settings_service.get_int("poll_max_options")]
 
     message = ChatMessage(conversation_id=conversation.id, sender_id=current_user.id, message_type="poll")
     db.session.add(message)

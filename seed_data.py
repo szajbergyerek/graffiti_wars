@@ -264,7 +264,7 @@ def main() -> None:
         print(f"Created {len(bands_created)} bands and {tags_created} approved tag points.")
 
         print("Recomputing territories for the whole map...")
-        TerritoryEngine().recompute_all()
+        TerritoryEngine.from_settings().recompute_all()
         print("Territories recomputed.")
 
         print(f"Fetching real OpenStreetMap landmark data for {len(bands_created)} gangs (this can take a while)...")

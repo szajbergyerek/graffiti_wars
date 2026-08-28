@@ -9,7 +9,6 @@ from library.models.band import Band
 from library.models.band_territory import BandTerritory
 
 EARTH_RADIUS_KM = 6371.0
-DEFAULT_LOCAL_RADIUS_KM = 25.0
 
 
 class LeaderboardService:
@@ -47,7 +46,7 @@ class LeaderboardService:
             .all()
         )
 
-    def local_ranking(self, lat: float, lon: float, radius_km: float = DEFAULT_LOCAL_RADIUS_KM) -> List[BandTerritory]:
+    def local_ranking(self, lat: float, lon: float, radius_km: float) -> List[BandTerritory]:
         """
         Rank bands whose territory centroid is within `radius_km` of a point, largest first.
 

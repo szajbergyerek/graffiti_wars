@@ -16,7 +16,6 @@ class Config:
             f"@{os.environ['DATABASE_HOST']}:{os.environ['DATABASE_PORT']}/{os.environ['DATABASE_NAME']}"
         )
         self.max_content_length = 16 * 1024 * 1024
-        self.tag_radius_meters = 100.0
         self.google_client_id = os.environ["GOOGLE_CLIENT_ID"]
         self.google_client_secret = os.environ["GOOGLE_CLIENT_SECRET"]
         self.images_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images")

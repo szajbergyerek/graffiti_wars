@@ -5,26 +5,123 @@
   <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
 </a>
 {% endblock %}
-{% block header_title %}{{ t('tag.log_title') }}{% endblock %}
 {% block tab_bar %}{% endblock %}
 {% block content %}
-<div class="container section section-with-header-buttons" style="max-width:520px">
-  {% if tag_point.photo_image %}
-  <img src="{{ tag_point.photo_image.url }}" style="width:100%; border-radius:var(--radius); margin-bottom:16px" />
-  {% endif %}
-  <p class="mb-24">{{ t('tag.log_help') }}</p>
-
-  <form method="POST" enctype="multipart/form-data" class="card">
-    <div class="field mb-24">
-      <label>{{ t('tag.log_field_photo') }}</label>
-      <label class="dropzone" for="visitPhotoInput">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4V8Z"/><circle cx="12" cy="13" r="3.5"/></svg>
-        <div class="dropzone-text">{{ t('tag.log_field_photo') }}</div>
-        <div class="dropzone-filename"></div>
-      </label>
-      <input type="file" id="visitPhotoInput" name="photo" accept="image/*" capture="environment" required class="sr-only" />
-    </div>
-    <button type="submit" class="btn btn-primary btn-block">{{ t('tag.log_submit_button') }}</button>
-  </form>
+<div class="camera-wrap" id="cameraWrap">
+  <div class="camera-message" id="loadingMessage"><p>{{ t('tag.log_checking_location') }}</p></div>
 </div>
+<canvas id="captureCanvas" class="sr-only"></canvas>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(() => {
+  const wrap = document.getElementById("cameraWrap");
+  const canvas = document.getElementById("captureCanvas");
+
+  const tagLat = {{ tag_point.lat | tojson }};
+  const tagLon = {{ tag_point.lon | tojson }};
+  const maxDistanceMeters = {{ max_distance_meters | tojson }};
+  const detailUrl = {{ url_for('tags.tag_detail', tag_id=tag_point.id) | tojson }};
+  const logUrl = {{ url_for('tags.log_visit', tag_id=tag_point.id) | tojson }};
+  const backButtonText = {{ t('tag.camera_back_button') | tojson }};
+
+  function showMessage(text) {
+    wrap.innerHTML =
+      `<div class="camera-message"><p>${escapeHtml(text)}</p>` +
+      `<a href="${detailUrl}" class="btn btn-secondary">${escapeHtml(backButtonText)}</a></div>`;
+  }
+
+  function distanceMeters(lat1, lon1, lat2, lon2) {
+    const earthRadius = 6371000;
+    const rad = (d) => (d * Math.PI) / 180;
+    const deltaPhi = rad(lat2 - lat1);
+    const deltaLambda = rad(lon2 - lon1);
+    const a =
+      Math.sin(deltaPhi / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(deltaLambda / 2) ** 2;
+    return 2 * earthRadius * Math.asin(Math.sqrt(a));
+  }
+
+  async function startCamera(userLat, userLon) {
+    wrap.innerHTML =
+      `<video id="cameraVideo" class="camera-video" autoplay playsinline muted></video>` +
+      `<div class="camera-shutter-row"><button type="button" id="shutterBtn" class="camera-shutter-btn" ` +
+      `aria-label="${escapeHtml(shutterLabel)}"></button></div>`;
+
+    const video = document.getElementById("cameraVideo");
+    const shutterBtn = document.getElementById("shutterBtn");
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    } catch (err) {
+      showMessage(cameraPermissionDeniedText);
+      return;
+    }
+    video.srcObject = stream;
+
+    let capturing = false;
+    shutterBtn.addEventListener("click", () => {
+      if (capturing) return;
+      capturing = true;
+      shutterBtn.disabled = true;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(async (blob) => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        const formData = new FormData();
+        formData.append("photo", blob, "capture.jpg");
+        formData.append("lat", userLat);
+        formData.append("lon", userLon);
+
+        const response = await fetch(logUrl, { method: "POST", body: formData });
+
+        if (response.redirected) {
+          window.location = response.url;
+          return;
+        }
+
+        const html = await response.text();
+        document.open();
+        document.write(html);
+        document.close();
+      }, "image/jpeg", 0.92);
+    });
+  }
+
+  const shutterLabel = {{ t('tag.camera_shutter') | tojson }};
+  const cameraUnavailableText = {{ t('tag.camera_unavailable') | tojson }};
+  const cameraPermissionDeniedText = {{ t('tag.camera_permission_denied') | tojson }};
+  const locationUnavailableText = {{ t('tag.location_unavailable') | tojson }};
+  const tooFarText = {{ t('tag.log_too_far') | tojson }};
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showMessage(cameraUnavailableText);
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    showMessage(locationUnavailableText);
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const userLat = position.coords.latitude;
+      const userLon = position.coords.longitude;
+      const distance = distanceMeters(userLat, userLon, tagLat, tagLon);
+      if (distance > maxDistanceMeters) {
+        showMessage(tooFarText);
+        return;
+      }
+      startCamera(userLat, userLon);
+    },
+    () => showMessage(locationUnavailableText),
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+})();
+</script>
 {% endblock %}

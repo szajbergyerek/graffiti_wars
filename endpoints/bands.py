@@ -20,6 +20,7 @@ from library.models.user import User
 from library.services.chat_service import ChatService
 from library.services.image_storage import ImageStorage
 from library.services.leaderboard_service import LeaderboardService
+from library.services.settings_service import SettingsService
 from library.services.territory_engine import TerritoryEngine
 from library.services.translator import t
 from library.services.username_validator import UsernameValidator
@@ -30,6 +31,7 @@ bp_bands = Blueprint("bands", __name__, url_prefix="/bands")
 chat_service = ChatService()
 username_validator = UsernameValidator()
 leaderboard_service = LeaderboardService()
+settings_service = SettingsService()
 
 
 def _query_bands(query_text, sort_key, scope, join_policy_filter, lat=None, lon=None):
@@ -47,7 +49,12 @@ def _query_bands(query_text, sort_key, scope, join_policy_filter, lat=None, lon=
         bands = [band for band in bands if nationality_code and band.nationality_code == nationality_code]
     elif scope == "local":
         if lat is not None and lon is not None:
-            local_band_ids = {t.band_id for t in leaderboard_service.local_ranking(lat, lon)}
+            local_band_ids = {
+                t.band_id
+                for t in leaderboard_service.local_ranking(
+                    lat, lon, radius_km=settings_service.get("local_leaderboard_radius_km")
+                )
+            }
             bands = [band for band in bands if band.id in local_band_ids]
         else:
             bands = []
@@ -424,7 +431,7 @@ def disband_band(band_id: int):
     _delete_band(band)
     db.session.commit()
 
-    TerritoryEngine().recompute_all()
+    TerritoryEngine.from_settings().recompute_all()
     flash(t("flash.band_disbanded", band=band_name), "success")
     return redirect(url_for("index.index"))
 
@@ -502,7 +509,7 @@ def kick_member(band_id: int, user_id: int):
     band_deleted = _delete_band_if_empty(band)
     db.session.commit()
     if band_deleted:
-        TerritoryEngine().recompute_all()
+        TerritoryEngine.from_settings().recompute_all()
 
     flash(t("flash.member_kicked", username=member.username), "success")
     if band_deleted:
@@ -527,7 +534,7 @@ def leave_band():
     band_deleted = _delete_band_if_empty(band)
     db.session.commit()
     if band_deleted:
-        TerritoryEngine().recompute_all()
+        TerritoryEngine.from_settings().recompute_all()
 
     flash(t("flash.left_band"), "success")
     return redirect(url_for("index.index"))

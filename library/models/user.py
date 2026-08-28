@@ -26,6 +26,13 @@ class User(db.Model, UserMixin):
     allow_direct_messages = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
+    # Last location a tag submission or tag-visit log was accepted from, used
+    # only for teleport-speed anti-cheat checks (see endpoints/tags.py) - not
+    # shown anywhere in the UI.
+    last_location_lat = db.Column(db.Float, nullable=True)
+    last_location_lon = db.Column(db.Float, nullable=True)
+    last_location_at = db.Column(db.DateTime, nullable=True)
+
     band_id = db.Column(db.Integer, db.ForeignKey("bands.id"), nullable=True)
     band_role = db.Column(db.String(16), nullable=True)
     band_joined_at = db.Column(db.DateTime, nullable=True)

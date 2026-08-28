@@ -2,6 +2,7 @@ import logging
 
 from dotenv import load_dotenv
 from flask import Flask, g, request
+from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from endpoints.admin import bp_admin
@@ -39,7 +40,6 @@ def create_app() -> Flask:
     app.config["SQLALCHEMY_DATABASE_URI"] = config.database_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["MAX_CONTENT_LENGTH"] = config.max_content_length
-    app.config["TAG_RADIUS_METERS"] = config.tag_radius_meters
     app.config["IMAGES_ROOT"] = config.images_root
     app.config["DEV_AUTO_LOGIN"] = config.dev_auto_login
 
@@ -92,6 +92,7 @@ def create_app() -> Flask:
         from library.models.poll import Poll
         from library.models.poll_option import PollOption
         from library.models.poll_vote import PollVote
+        from library.models.site_setting import SiteSetting
         from library.models.tag_comment import TagComment
         from library.models.tag_point import TagPoint
         from library.models.tag_report import TagReport
@@ -99,6 +100,17 @@ def create_app() -> Flask:
         from library.models.user import User
 
         db.create_all()
+
+        # db.create_all() only creates tables that don't exist yet - it never
+        # alters an existing table's columns. There's no migration tool in
+        # this project, so new nullable columns are added this way instead,
+        # idempotently, so both a fresh DB and an already-running one (e.g.
+        # the production deployment) pick them up on next startup with no
+        # manual step and no data loss.
+        db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_location_lat DOUBLE PRECISION"))
+        db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_location_lon DOUBLE PRECISION"))
+        db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_location_at TIMESTAMP"))
+        db.session.commit()
 
     return app
 

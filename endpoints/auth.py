@@ -40,7 +40,7 @@ def _unique_username(base_username: str) -> str:
     while User.query.filter_by(username=candidate).first() is not None:
         suffix += 1
         marker = f"_{suffix}"
-        candidate = f"{base_username[: UsernameValidator.MAX_LENGTH - len(marker)]}{marker}"
+        candidate = f"{base_username[: username_validator.MAX_LENGTH - len(marker)]}{marker}"
     return candidate
 
 

@@ -9,11 +9,11 @@ from shapely.geometry.base import BaseGeometry
 from library.extensions import db
 from library.models.band import Band
 from library.models.landmark import LANDMARK_CATEGORIES, Landmark
+from library.services.settings_service import SettingsService
 
 logger = logging.getLogger("landmark_service")
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-OVERPASS_TIMEOUT_SECONDS = 25
 OVERPASS_HEADERS = {"User-Agent": "GraffitiWars/1.0 (contact: graffitiwars app)"}
 
 
@@ -44,10 +44,11 @@ class LandmarkService:
         geometry = shape(json.loads(band.territory.geojson))
         polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
 
-        query = self._build_query(polygons)
+        timeout_seconds = SettingsService().get_int("overpass_timeout_seconds")
+        query = self._build_query(polygons, timeout_seconds)
         try:
             response = requests.post(
-                OVERPASS_URL, data={"data": query}, timeout=OVERPASS_TIMEOUT_SECONDS, headers=OVERPASS_HEADERS
+                OVERPASS_URL, data={"data": query}, timeout=timeout_seconds, headers=OVERPASS_HEADERS
             )
             response.raise_for_status()
             elements = response.json().get("elements", [])
@@ -92,7 +93,7 @@ class LandmarkService:
         logger.info("Refreshed %s landmarks for band %s", len(seen_osm_ids), band.id)
         return True
 
-    def _build_query(self, polygons: List[BaseGeometry]) -> str:
+    def _build_query(self, polygons: List[BaseGeometry], timeout_seconds: int) -> str:
         clauses = []
         for polygon in polygons:
             poly_filter = " ".join(f"{lat} {lon}" for lon, lat in polygon.exterior.coords)
@@ -100,4 +101,4 @@ class LandmarkService:
                 clauses.append(f'nwr["{category}"](poly:"{poly_filter}");')
 
         body = "\n  ".join(clauses)
-        return f'[out:json][timeout:{OVERPASS_TIMEOUT_SECONDS}];\n(\n  {body}\n);\nout center tags;'
+        return f'[out:json][timeout:{timeout_seconds}];\n(\n  {body}\n);\nout center tags;'

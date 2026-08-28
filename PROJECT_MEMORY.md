@@ -303,6 +303,157 @@ integration point for the real verification model from the separate
 **Still true**: `ImageStorage.save()` only flushes, doesn't commit — each
 wizard step boundary needs its own `db.session.commit()`.
 
+**Also fixed this round**: `finalize()`'s `landmark_service.refresh_for_band()`
+call was synchronous and blocking — the public Overpass API measured **46.5s**
+to time out against the seeded dataset (confirmed with a standalone timing
+script), which is why the processing spinner appeared to hang forever instead
+of finishing after its 3s minimum. Fixed by running the landmark refresh on a
+background `threading.Thread` (`_refresh_landmarks_async` in `tags.py`) so
+`finalize()` returns as soon as the `TagPoint` + territory recompute are done
+(`TerritoryEngine.recompute_all()` itself is fast, ~0.3s on this dataset — it
+was never the bottleneck). `finalize()` now also redirects to the new tag's
+own detail page (`tags.tag_detail`) instead of the map.
+
+**Shared camera CSS**: `.camera-wrap`/`.camera-video`/`.camera-shutter-btn`/
+`.camera-message`/`.camera-status-banner` live in `static/css/style.css` now
+(moved out of `tag_submit_upload.html`'s own `<style>` block), since a second
+page reuses the exact same live-camera UI — see "Tag visit logging" below.
+
+## Tag visit logging — also rebuilt around geolocation + live camera
+
+The "Log" button in each map marker's popup (`/tags/<id>/log`) used to be a
+plain file-upload form; it's now `tag_log_upload.html`, which — unlike the
+tag-submission camera page — checks location **first, then** opens the camera:
+
+1. On load, immediately calls `navigator.geolocation.getCurrentPosition()`.
+2. Computes the distance (Haversine, client-side JS) from the user's current
+   position to the tag's own `lat`/`lon`. If it's over **10 meters**
+   (`LOG_VISIT_MAX_DISTANCE_METERS` in `tags.py`), shows a message ("you're
+   too far, get within 10m and try again") with a link back to the tag detail
+   page — the camera never opens at all.
+3. If within range, opens the live camera (same `getUserMedia`/canvas/shutter
+   pattern as tag submission) and on capture uploads the photo **plus the
+   already-measured user lat/lon** (not the tag's own coordinates) to
+   `POST /tags/<id>/log`.
+4. `log_visit()` re-checks the same 10m distance server-side using the
+   submitted lat/lon vs. `tag_point.lat`/`lon` (`_distance_meters()` helper,
+   a plain Haversine function in `tags.py`) — this is a deliberate
+   defense-in-depth check since the client-side gate can be bypassed (e.g. a
+   direct POST). Rejects with `flash(t("tag.log_too_far"))` if too far.
+5. `TagVisit` itself still doesn't store the visit's lat/lon (no model change
+   here) — the coordinates are only used for the proximity check, not persisted.
+
+Real photo-matching against the tag is still not implemented (same
+"accept everything once proximity-checked" pattern as before) — only the
+location gate is new/real here.
+
+## Anti-cheat: teleport-speed detection (GPS spoofing mitigation)
+
+Prompted by the user asking how spoofable the GPS-based checks are (answer:
+very — browser DevTools can fake `navigator.geolocation` in a couple of
+clicks, and a direct POST bypasses the client JS entirely; this is a
+friction/plausibility layer, not a cryptographic guarantee). Implemented in
+`endpoints/tags.py`:
+
+- **`User.last_location_lat/lon/at`** (new nullable columns, `library/models/user.py`)
+  cache the location + timestamp of the user's last *accepted* tag submission
+  or tag-visit log. Not shown anywhere in the UI.
+- **`_is_teleport(user, lat, lon, now)`** computes the implied travel speed
+  between that cached location and the new one (Haversine distance / elapsed
+  time). Flags it if speed exceeds `MAX_TRAVEL_SPEED_KMH = 130` (generous
+  highway-driving threshold, chosen to avoid false positives for legit users
+  travelling by car/train between city tags). A `TELEPORT_DISTANCE_TOLERANCE_METERS
+  = 50` floor absorbs ordinary GPS jitter between two near-simultaneous actions
+  and avoids division-by-near-zero weirdness.
+- Wired into **both** `finalize()` (tag submission) and `log_visit()` POST
+  (tag visit logging) — on a flag, rejects with `flash(t("flash.teleport_detected"))`
+  and no record is created. `_remember_location()` updates the cached location
+  only on a successful (non-rejected) submission/log.
+- `finalize()`'s check happens before creating the `TagPoint`, right where the
+  "real AI verification" placeholder comment already lives — same integration
+  point, this is just the first real defensive check to land there.
+- **No migration tool exists in this project** (no Alembic/Flask-Migrate) —
+  `db.create_all()` only creates missing tables, it never alters an existing
+  one's columns. Since this needed 3 new columns on an already-deployed
+  `users` table (both local dev DB and the live production DB), `main.py`'s
+  `create_app()` now runs three idempotent `ALTER TABLE users ADD COLUMN IF
+  NOT EXISTS ...` statements right after `db.create_all()` — safe to run on
+  every startup, self-heals any DB that doesn't have the columns yet without
+  needing a manual reseed or hand-run SQL on the server. If more schema
+  changes like this come up, follow the same pattern rather than introducing
+  a migration framework unless asked.
+- **What this does and doesn't defend against**: catches the "lazy"/accidental
+  cheating case well (can't submit from two far-apart real locations faster
+  than physically possible) and needs zero extra client trust. Does NOT stop
+  a determined attacker who fakes both coordinates *and* the previous
+  reference point consistently across a spoofing session — there's no way to
+  achieve that from a plain web app without native OS-level attestation.
+  Discussed with the user as one layer among several (also floated but not
+  yet implemented: `geolocation.coords.accuracy` threshold, exact-duplicate-
+  coordinate detection, community reports + admin review which already
+  exists via `TagReport`/admin queue, and eventually the real AI photo
+  verification).
+
+## Admin-editable settings (new: `site_settings` table + `/admin/settings`)
+
+Prompted by the user asking for every hardcoded "meter or other threshold"
+value across the project to be DB-backed and admin-editable. Implemented as
+a generic key/value settings system, not one column per value:
+
+- **`library/models/site_setting.py`** — `SiteSetting(key: str primary key,
+  value: float)`. Only admin *overrides* live here; a key with no row falls
+  back to its built-in default.
+- **`library/services/settings_service.py`** — `SettingsService`, with
+  `DEFAULT_SETTINGS` (the single source of truth for every key + its
+  default) and `get(key)` / `get_int(key)` / `get_all()` / `set(key, value)`.
+  Labels/descriptions shown in the admin UI are NOT here — they're
+  `t("setting.<key>_label")` / `t("setting.<key>_description")` in
+  `translations.py`, same as every other user-facing string in this app.
+- **`/admin/settings`** (`endpoints/admin.py`) — a 4th admin nav tab (queue /
+  users / bands / **settings**), one form with a number input per setting,
+  short label + description under each, one Save button. POST parses every
+  submitted value as float and calls `settings_service.set()` for each,
+  logs an `AdminAction(action_type="update_settings")`.
+- **11 settings currently registered** (`SettingsService.DEFAULT_SETTINGS` /
+  `SETTINGS_DISPLAY_ORDER` in `admin.py`): `tag_radius_meters` (100),
+  `cluster_link_multiplier` (4), `log_visit_max_distance_meters` (10),
+  `max_travel_speed_kmh` (130), `teleport_distance_tolerance_meters` (50),
+  `local_leaderboard_radius_km` (25), `overpass_timeout_seconds` (25),
+  `username_min_length` (3), `username_max_length` (24), `poll_min_options`
+  (2), `poll_max_options` (4). `EARTH_RADIUS_METERS`/`EARTH_RADIUS_KM`
+  (physical constants, not thresholds) were deliberately left hardcoded.
+- **`TerritoryEngine.from_settings()`** (classmethod, `territory_engine.py`)
+  builds an engine from the current `tag_radius_meters`/`cluster_link_multiplier`
+  settings — every `TerritoryEngine(...)` call site in the codebase (7 of
+  them: `tags.py`, `admin.py` x2, `bands.py` x3, `seed_data.py`) now goes
+  through this instead of the class's hardcoded defaults. **This incidentally
+  fixed a real pre-existing bug**: 6 of those 7 call sites were plain
+  `TerritoryEngine()` with no `radius_meters` arg at all, silently ignoring
+  whatever the configured radius was supposed to be — only `tags.py`'s
+  `finalize()` ever actually passed it through. Now they're all consistent.
+- **`UsernameValidator.MIN_LENGTH`/`MAX_LENGTH`** changed from class
+  attributes to `@property` methods that call `SettingsService` at access
+  time (not at `__init__`, since these validators are instantiated as
+  module-level singletons at import time in `auth.py`/`bands.py`/`profile.py`,
+  before the DB/app-context is guaranteed ready — only the property
+  *access*, which always happens inside a request, touches the DB). One
+  caller (`auth.py`'s `_unique_username`) referenced `UsernameValidator.MAX_LENGTH`
+  as a **class**-level attribute, which broke once it became a property —
+  fixed to use the existing `username_validator` instance instead.
+- **`library/config.py`**'s old `tag_radius_meters` and `main.py`'s
+  `app.config["TAG_RADIUS_METERS"]` were removed entirely — static
+  `app.config` set once at startup can't reflect live admin edits without a
+  restart, so every read site now calls `SettingsService` directly instead.
+- **Same idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` pattern** as
+  the teleport-detection columns applies here too, except `site_settings` is
+  a *brand-new* table, so plain `db.create_all()` handles it - no ALTER
+  needed, just the model import added to `main.py`'s `create_app()`.
+- Verified end-to-end: rebuilt the app (confirmed `site_settings` table
+  exists), called the `/admin/settings` POST view function directly with
+  a full form payload, confirmed values persisted and were read back via
+  `SettingsService.get()`, then deleted the test override rows so the local
+  DB is back on defaults.
+
 ## New feature: tag likes → removed, comments added, description added
 
 Order of events across rounds, in case it matters for git-blame archaeology:

@@ -45,6 +45,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "title.admin_queue": {"hu": "Moderáció", "en": "Moderation"},
     "title.admin_users": {"hu": "Felhasználók", "en": "Users"},
     "title.admin_bands": {"hu": "Bandák kezelése", "en": "Manage gangs"},
+    "title.admin_settings": {"hu": "Beállítások", "en": "Settings"},
 
     # ---------- Home page ----------
     "home.hero_title": {
@@ -319,12 +320,15 @@ STRINGS: dict[str, dict[str, str]] = {
     "tag.no_comments_yet": {"hu": "Még nincs hozzászólás.", "en": "No comments yet."},
     "tag.log_button": {"hu": "Logolás", "en": "Log"},
     "tag.log_title": {"hu": "Tag logolása", "en": "Log this tag"},
-    "tag.log_help": {
-        "hu": "Töltsd fel a saját fotódat, amivel igazolod, hogy jártál itt.",
-        "en": "Upload your own photo to confirm you were here.",
+    "tag.log_checking_location": {"hu": "Helyzet ellenőrzése...", "en": "Checking your location..."},
+    "flash.teleport_detected": {
+        "hu": "Ez a helyzet nem egyeztethető össze az előző, nemrég elfogadott helyzeteddel - túl gyorsnak tűnik az odaérés. Próbáld újra egy kis idő múlva.",
+        "en": "This location doesn't line up with your last accepted one - getting here that fast doesn't add up. Try again in a bit.",
     },
-    "tag.log_field_photo": {"hu": "Fénykép a helyszínről", "en": "Photo of the spot"},
-    "tag.log_submit_button": {"hu": "Logolás", "en": "Log it"},
+    "tag.log_too_far": {
+        "hu": "Túl messze vagy ettől a tagtől ahhoz, hogy logold. Menj a hely közelébe (10 méteren belülre), és próbáld újra.",
+        "en": "You're too far from this tag to log it. Get within 10 meters of the spot and try again.",
+    },
     "tag.search_button": {"hu": "Tag keresése", "en": "Search a tag"},
     "tag.search_title": {"hu": "Melyik bandáé ez a tag?", "en": "Whose tag is this?"},
     "tag.search_help": {
@@ -338,6 +342,69 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin.nav_queue": {"hu": "Várólista", "en": "Queue"},
     "admin.nav_users": {"hu": "Felhasználók", "en": "Users"},
     "admin.nav_bands": {"hu": "Bandák", "en": "Gangs"},
+    "admin.nav_settings": {"hu": "Beállítások", "en": "Settings"},
+    "admin.settings_save_button": {"hu": "Mentés", "en": "Save"},
+    "flash.settings_saved": {"hu": "Beállítások elmentve.", "en": "Settings saved."},
+
+    "setting.tag_radius_meters_label": {"hu": "Tag hatósugara (m)", "en": "Tag radius (m)"},
+    "setting.tag_radius_meters_description": {
+        "hu": "Ekkora sugarú kör körül számol területet minden lerakott tag.",
+        "en": "The radius around each tag used to compute claimed territory.",
+    },
+    "setting.cluster_link_multiplier_label": {"hu": "Klaszter-összekötés szorzó", "en": "Cluster link multiplier"},
+    "setting.cluster_link_multiplier_description": {
+        "hu": "Ennyiszer a tag-sugár távolságon belüli tagek olvadnak egy klaszterbe.",
+        "en": "Tags within this many times the tag radius merge into one cluster.",
+    },
+    "setting.log_visit_max_distance_meters_label": {"hu": "Logolás max. távolság (m)", "en": "Max log distance (m)"},
+    "setting.log_visit_max_distance_meters_description": {
+        "hu": "Ilyen távolságon belül kell lenni egy tagtől a logoláshoz.",
+        "en": "You must be within this distance of a tag to log it.",
+    },
+    "setting.max_travel_speed_kmh_label": {"hu": "Teleport-küszöb (km/h)", "en": "Teleport threshold (km/h)"},
+    "setting.max_travel_speed_kmh_description": {
+        "hu": "E fölötti implikált sebesség gyanús helyzetváltozásnak számít.",
+        "en": "An implied travel speed above this counts as a suspicious location jump.",
+    },
+    "setting.teleport_distance_tolerance_meters_label": {
+        "hu": "Teleport-tolerancia (m)", "en": "Teleport tolerance (m)",
+    },
+    "setting.teleport_distance_tolerance_meters_description": {
+        "hu": "Ekkora távolságváltozást a GPS-zaj miatt figyelmen kívül hagyunk.",
+        "en": "Location changes within this distance are ignored as GPS noise.",
+    },
+    "setting.local_leaderboard_radius_km_label": {
+        "hu": "Helyi toplista sugara (km)", "en": "Local leaderboard radius (km)",
+    },
+    "setting.local_leaderboard_radius_km_description": {
+        "hu": "Ekkora körzetben lévő bandákat mutatja a \"helyi\" rangsor.",
+        "en": "Gangs within this radius appear in the \"local\" ranking.",
+    },
+    "setting.overpass_timeout_seconds_label": {"hu": "Overpass API timeout (mp)", "en": "Overpass API timeout (s)"},
+    "setting.overpass_timeout_seconds_description": {
+        "hu": "Ennyi ideig vár a szerver az OpenStreetMap-lekérdezés válaszára.",
+        "en": "How long the server waits for an OpenStreetMap query response.",
+    },
+    "setting.username_min_length_label": {"hu": "Felhasználónév min. hossz", "en": "Username min length"},
+    "setting.username_min_length_description": {
+        "hu": "Ennél rövidebb felhasználónév nem engedélyezett.",
+        "en": "Usernames shorter than this aren't allowed.",
+    },
+    "setting.username_max_length_label": {"hu": "Felhasználónév max. hossz", "en": "Username max length"},
+    "setting.username_max_length_description": {
+        "hu": "Ennél hosszabb felhasználónév nem engedélyezett.",
+        "en": "Usernames longer than this aren't allowed.",
+    },
+    "setting.poll_min_options_label": {"hu": "Szavazás min. opciószám", "en": "Poll min options"},
+    "setting.poll_min_options_description": {
+        "hu": "Ennél kevesebb válaszlehetőséggel nem hozható létre szavazás.",
+        "en": "Polls need at least this many options.",
+    },
+    "setting.poll_max_options_label": {"hu": "Szavazás max. opciószám", "en": "Poll max options"},
+    "setting.poll_max_options_description": {
+        "hu": "Ennél több válaszlehetőséget levág a szavazás.",
+        "en": "Polls are capped at this many options.",
+    },
     "admin.queue_title": {"hu": "Moderációs várólista", "en": "Moderation queue"},
     "admin.table_band": {"hu": "Banda", "en": "Gang"},
     "admin.table_action": {"hu": "Művelet", "en": "Action"},

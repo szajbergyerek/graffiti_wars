@@ -1,4 +1,5 @@
 import logging
+import math
 import threading
 from datetime import datetime
 
@@ -18,13 +19,81 @@ from library.models.tag_report import TagReport
 from library.models.tag_visit import TagVisit
 from library.services.image_storage import ImageStorage
 from library.services.landmark_service import LandmarkService
+from library.services.settings_service import SettingsService
 from library.services.territory_engine import TerritoryEngine
 from library.services.translator import t
 
 bp_tags = Blueprint("tags", __name__)
 landmark_service = LandmarkService()
+settings_service = SettingsService()
 
 logger = logging.getLogger("tag_submission")
+
+# Earth's radius is a physical constant, not an admin-editable setting.
+EARTH_RADIUS_METERS = 6_371_000.0
+
+
+def _distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Compute the great-circle distance between two lat/lon points.
+
+    param lat1: Latitude of the first point, in degrees.
+    param lon1: Longitude of the first point, in degrees.
+    param lat2: Latitude of the second point, in degrees.
+    param lon2: Longitude of the second point, in degrees.
+
+    :return: The distance between the two points, in meters.
+    """
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    return 2 * EARTH_RADIUS_METERS * math.asin(math.sqrt(a))
+
+
+def _is_teleport(user, lat: float, lon: float, now: datetime) -> bool:
+    """
+    Flag a new location as implausible given the user's last accepted location.
+
+    Compares the implied travel speed between the user's last known
+    tag-submission/log location and this new one - if it's faster than any
+    realistic mode of transport could cover, the new location is almost
+    certainly spoofed (or the previous one was). A small distance tolerance
+    absorbs ordinary GPS jitter between two near-simultaneous actions.
+
+    param user: The current user, whose `last_location_lat/lon/at` fields hold their last accepted location.
+    param lat: Latitude of the new location, in degrees.
+    param lon: Longitude of the new location, in degrees.
+    param now: The current timestamp, used to compute elapsed time since the last accepted location.
+
+    :return: True if the implied travel speed is implausibly high.
+    """
+    if user.last_location_at is None or user.last_location_lat is None or user.last_location_lon is None:
+        return False
+
+    distance_m = _distance_meters(lat, lon, user.last_location_lat, user.last_location_lon)
+    if distance_m <= settings_service.get("teleport_distance_tolerance_meters"):
+        return False
+
+    elapsed_seconds = max((now - user.last_location_at).total_seconds(), 1.0)
+    implied_speed_kmh = (distance_m / 1000) / (elapsed_seconds / 3600)
+    return implied_speed_kmh > settings_service.get("max_travel_speed_kmh")
+
+
+def _remember_location(user, lat: float, lon: float, now: datetime) -> None:
+    """
+    Record the user's latest accepted location, for future teleport checks.
+
+    param user: The current user.
+    param lat: Latitude of the accepted location, in degrees.
+    param lon: Longitude of the accepted location, in degrees.
+    param now: The timestamp of this location.
+
+    :return: None.
+    """
+    user.last_location_lat = lat
+    user.last_location_lon = lon
+    user.last_location_at = now
 
 
 def _refresh_landmarks_async(app, band_id: int) -> None:
@@ -153,6 +222,11 @@ def finalize():
     if lat is None or lon is None:
         return jsonify({"error": "missing_location"}), 400
 
+    now = datetime.utcnow()
+    if _is_teleport(current_user, lat, lon, now):
+        flash(t("flash.teleport_detected"), "error")
+        return jsonify({"redirect_url": url_for("tags.map_view")})
+
     # The real AI verification model isn't ready yet - every submission is approved for now.
     tag_point = TagPoint(
         band_id=current_user.band_id,
@@ -165,9 +239,10 @@ def finalize():
         ai_confidence=None,
     )
     db.session.add(tag_point)
+    _remember_location(current_user, lat, lon, now)
     db.session.commit()
 
-    TerritoryEngine(radius_meters=current_app.config["TAG_RADIUS_METERS"]).recompute_all()
+    TerritoryEngine.from_settings().recompute_all()
     threading.Thread(
         target=_refresh_landmarks_async,
         args=(current_app._get_current_object(), current_user.band_id),
@@ -300,25 +375,53 @@ def log_visit(tag_id: int):
 
     if request.method == "POST":
         photo = request.files.get("photo")
-        if photo is None or photo.filename == "":
+        lat = request.form.get("lat", type=float)
+        lon = request.form.get("lon", type=float)
+
+        if photo is None or photo.filename == "" or lat is None or lon is None:
             flash(t("flash.tag_missing_fields"), "error")
-            return render_template("tag_log_upload.html", tag_point=tag_point)
+            return render_template(
+                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
+            )
+
+        # The location comes from the browser's Geolocation API, captured right
+        # before the camera opened (see tag_log_upload.html) - re-checked here
+        # server-side too, since the client-side gate can be bypassed.
+        if _distance_meters(lat, lon, tag_point.lat, tag_point.lon) > settings_service.get(
+            "log_visit_max_distance_meters"
+        ):
+            flash(t("tag.log_too_far"), "error")
+            return render_template(
+                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
+            )
+
+        now = datetime.utcnow()
+        if _is_teleport(current_user, lat, lon, now):
+            flash(t("flash.teleport_detected"), "error")
+            return render_template(
+                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
+            )
 
         storage = ImageStorage(current_app.config["IMAGES_ROOT"])
         try:
             image = storage.save(photo, "tag_visits", uploaded_by_id=current_user.id)
         except ValueError:
             flash(t("flash.unsupported_image"), "error")
-            return render_template("tag_log_upload.html", tag_point=tag_point)
+            return render_template(
+                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
+            )
 
-        # Real photo/location matching against the tag isn't ready yet - every log is accepted for now.
+        # Real photo matching against the tag isn't ready yet - proximity-checked visits are accepted for now.
         db.session.add(TagVisit(tag_point_id=tag_point.id, visitor_id=current_user.id, photo_image_id=image.id))
+        _remember_location(current_user, lat, lon, now)
         db.session.commit()
 
         flash(t("flash.tag_logged"), "success")
         return redirect(url_for("tags.tag_detail", tag_id=tag_point.id))
 
-    return render_template("tag_log_upload.html", tag_point=tag_point)
+    return render_template(
+        "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
+    )
 
 
 @bp_tags.route("/tags/search", methods=["GET", "POST"])

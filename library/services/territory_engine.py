@@ -49,6 +49,22 @@ class TerritoryEngine:
         self.radius_meters = radius_meters
         self.cluster_link_distance = radius_meters * cluster_link_multiplier
 
+    @classmethod
+    def from_settings(cls) -> "TerritoryEngine":
+        """
+        Build a TerritoryEngine using the admin-configured `tag_radius_meters`
+        and `cluster_link_multiplier` settings, instead of the class defaults.
+
+        :return: A TerritoryEngine ready to call recompute_all() on.
+        """
+        from library.services.settings_service import SettingsService
+
+        settings = SettingsService()
+        return cls(
+            radius_meters=settings.get("tag_radius_meters"),
+            cluster_link_multiplier=settings.get("cluster_link_multiplier"),
+        )
+
     def recompute_all(self) -> None:
         """
         Replay every approved tag point in creation order and persist the

@@ -2,6 +2,8 @@ import re
 import unicodedata
 from typing import Optional
 
+from library.services.settings_service import SettingsService
+
 BLOCKED_CATEGORIES = {
     "Cc",  # control characters
     "Cf",  # format characters (zero-width tricks, bidi overrides, ...)
@@ -31,8 +33,16 @@ class UsernameValidator:
     length limits.
     """
 
-    MIN_LENGTH = 3
-    MAX_LENGTH = 24
+    def __init__(self) -> None:
+        self._settings = SettingsService()
+
+    @property
+    def MIN_LENGTH(self) -> int:
+        return self._settings.get_int("username_min_length")
+
+    @property
+    def MAX_LENGTH(self) -> int:
+        return self._settings.get_int("username_max_length")
 
     def normalize(self, username: str) -> str:
         """

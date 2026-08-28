@@ -2,9 +2,11 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user
 
 from library.services.leaderboard_service import LeaderboardService
+from library.services.settings_service import SettingsService
 
 bp_leaderboard = Blueprint("leaderboard", __name__)
 leaderboard_service = LeaderboardService()
+settings_service = SettingsService()
 
 
 @bp_leaderboard.route("/leaderboard")
@@ -28,7 +30,9 @@ def leaderboard_api():
         lon = request.args.get("lon", type=float)
         if lat is None or lon is None:
             return jsonify({"error": "no_location"}), 400
-        territories = leaderboard_service.local_ranking(lat, lon)
+        territories = leaderboard_service.local_ranking(
+            lat, lon, radius_km=settings_service.get("local_leaderboard_radius_km")
+        )
     else:
         territories = leaderboard_service.global_ranking()
 

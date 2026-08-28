@@ -18,11 +18,28 @@ from library.models.tag_point import TagPoint
 from library.models.tag_report import TagReport
 from library.models.user import User
 from library.services.landmark_service import LandmarkService
+from library.services.settings_service import DEFAULT_SETTINGS, SettingsService
 from library.services.territory_engine import TerritoryEngine
 from library.services.translator import t
 
 bp_admin = Blueprint("admin", __name__, url_prefix="/admin")
 landmark_service = LandmarkService()
+settings_service = SettingsService()
+
+# Display order for the admin settings page - game-balance/anti-cheat values first, validation limits after.
+SETTINGS_DISPLAY_ORDER = [
+    "tag_radius_meters",
+    "cluster_link_multiplier",
+    "log_visit_max_distance_meters",
+    "max_travel_speed_kmh",
+    "teleport_distance_tolerance_meters",
+    "local_leaderboard_radius_km",
+    "overpass_timeout_seconds",
+    "username_min_length",
+    "username_max_length",
+    "poll_min_options",
+    "poll_max_options",
+]
 
 
 def admin_required(view):
@@ -98,7 +115,7 @@ def resolve_report(report_id: int):
     db.session.commit()
 
     if action == "remove_tag":
-        TerritoryEngine().recompute_all()
+        TerritoryEngine.from_settings().recompute_all()
         landmark_service.refresh_for_band(affected_band)
 
     flash(t("flash.report_closed"), "success")
@@ -219,6 +236,38 @@ def delete_band(band_id: int):
     db.session.delete(band)
     db.session.commit()
 
-    TerritoryEngine().recompute_all()
+    TerritoryEngine.from_settings().recompute_all()
     flash(t("flash.band_deleted"), "success")
     return redirect(url_for("admin.bands"))
+
+
+@bp_admin.route("/settings", methods=["GET", "POST"])
+@admin_required
+def settings():
+    if request.method == "POST":
+        for key in DEFAULT_SETTINGS:
+            raw_value = request.form.get(key)
+            try:
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                continue
+            settings_service.set(key, value)
+
+        db.session.add(
+            AdminAction(admin_id=current_user.id, action_type="update_settings", target_description="Site settings")
+        )
+        db.session.commit()
+        flash(t("flash.settings_saved"), "success")
+        return redirect(url_for("admin.settings"))
+
+    current_values = settings_service.get_all()
+    settings_list = [
+        {
+            "key": key,
+            "value": current_values[key],
+            "label": t(f"setting.{key}_label"),
+            "description": t(f"setting.{key}_description"),
+        }
+        for key in SETTINGS_DISPLAY_ORDER
+    ]
+    return render_template("admin/settings.html", settings=settings_list)
