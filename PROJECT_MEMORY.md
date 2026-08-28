@@ -748,12 +748,14 @@ host port **2432** (`web`'s container port 5000 → host 2432), reachable
 publicly at `https://graffiti.balintdaniel.com/` via the user's existing
 nginx proxy manager setup.
 
-**Volume host paths, now derived from a single `STORAGE_PATH` env var**
-(optional, defaults to `/STORAGE/docker/graffiti_wars` if unset - see
-`.env.example`): `${STORAGE_PATH}/database` → Postgres data,
-`${STORAGE_PATH}/website` → `/app/assets` inside the container (note: NOT
-`/app/assets/images` — the mounted folder becomes the parent of the
-`images/` subfolder the app itself creates).
+**Volume host paths, now derived from a single required `STORAGE_PATH` env
+var** (`docker compose` fails fast with a clear error if it's unset — no
+server-specific default is baked into `docker-compose.yml`, deliberately,
+since the repo is public now; see `.env.example`): `${STORAGE_PATH}/database`
+→ Postgres data, `${STORAGE_PATH}/website` → `/app/assets` inside the
+container (note: NOT `/app/assets/images` — the mounted folder becomes the
+parent of the `images/` subfolder the app itself creates). On the actual
+home server this is set to `/STORAGE/docker/graffiti_wars`.
 
 **⚠️ This changed the assets mount path from the base `STORAGE_PATH` folder
 itself to a `website` subfolder of it** (was: `/STORAGE/docker/graffiti_wars`
