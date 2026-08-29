@@ -101,6 +101,12 @@
       {{ t('profile.my_gang_button') }}
     </a>
     {% endif %}
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('admin.queue') }}" class="quick-action">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v6c0 5 4 9 9 9s9-4 9-9V7l-9-5Z"/></svg>
+      {{ t('nav.admin') }}
+    </a>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -131,15 +137,6 @@
   <div id="visitedTab" class="mb-32" style="display:none; grid-template-columns:repeat(3, 1fr); gap:12px"></div>
 
   {% if is_own_profile %}
-  {% if current_user.is_admin %}
-  <div class="card" style="padding:0 16px">
-    <a href="{{ url_for('admin.queue') }}" class="list-cell">
-      <div class="list-cell-leading"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v6c0 5 4 9 9 9s9-4 9-9V7l-9-5Z"/></svg></div>
-      <div class="list-cell-body"><div class="list-cell-title">{{ t('nav.admin') }}</div></div>
-      <div class="list-cell-trailing"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></div>
-    </a>
-  </div>
-  {% endif %}
   <p class="profile-footnote">{{ t('footer.rights') }}</p>
   {% endif %}
 </div>

@@ -127,22 +127,80 @@ function initBottomSheet(handleEl, sheetEl, backdropEl, onToggle) {
   return { setOpen, isOpen: () => sheetEl.classList.contains("open") };
 }
 
+// Mirrors library/services/color_utils.py's shade_hex_color() so the map
+// markers (built client-side) and server-rendered gradients stay in the
+// same tonal family for a given band color.
+function shadeHexColor(hex, lightnessDelta) {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.substring(0, 2), 16) / 255;
+  const g = parseInt(clean.substring(2, 4), 16) / 255;
+  const b = parseInt(clean.substring(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  let l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+
+  l = Math.min(1, Math.max(0, l + lightnessDelta));
+
+  function hue2rgb(p, q, t) {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  }
+
+  let rr;
+  let gg;
+  let bb;
+  if (s === 0) {
+    rr = l;
+    gg = l;
+    bb = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    rr = hue2rgb(p, q, h + 1 / 3);
+    gg = hue2rgb(p, q, h);
+    bb = hue2rgb(p, q, h - 1 / 3);
+  }
+
+  const toHex = (x) => Math.round(x * 255).toString(16).padStart(2, "0");
+  return `#${toHex(rr)}${toHex(gg)}${toHex(bb)}`;
+}
+
 function bandPinIcon(color) {
+  const lightShade = shadeHexColor(color, 0.22);
+  const darkShade = shadeHexColor(color, -0.22);
   const svg = `
-    <svg width="17" height="22" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
+    <svg width="18" height="24" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
       <ellipse cx="13" cy="32" rx="6" ry="1.6" fill="#000" opacity="0.35"/>
-      <rect x="10" y="0" width="6" height="3.5" rx="1.2" fill="#e8e6ee"/>
-      <rect x="8" y="3" width="10" height="4" rx="1.5" fill="#3a3a46"/>
-      <rect x="5" y="7" width="16" height="23" rx="4" fill="${color}" stroke="#fff" stroke-width="1.6"/>
-      <rect x="5" y="15" width="16" height="5" fill="#fff" opacity="0.22"/>
+      <rect x="15" y="1" width="5" height="3" rx="1" fill="${darkShade}" stroke="#000" stroke-width="1"/>
+      <rect x="9" y="1" width="7" height="5" rx="1.5" fill="${lightShade}" stroke="#000" stroke-width="1"/>
+      <rect x="6" y="6" width="14" height="4" rx="1.5" fill="${lightShade}" stroke="#000" stroke-width="1"/>
+      <rect x="5" y="9" width="16" height="21" rx="3" fill="${color}" stroke="#000" stroke-width="1.4"/>
+      <path d="M10 13c0 2-2 2-2 4s2 2 2 4" stroke="${darkShade}" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <rect x="7" y="12" width="3" height="15" rx="1.5" fill="#fff" opacity="0.2"/>
+      <rect x="5" y="27" width="16" height="3" rx="1.5" fill="${lightShade}" stroke="#000" stroke-width="1"/>
     </svg>
   `;
   return L.divIcon({
     html: svg,
     className: "band-pin-icon",
-    iconSize: [17, 22],
-    iconAnchor: [8, 21],
-    popupAnchor: [0, -19],
+    iconSize: [18, 24],
+    iconAnchor: [9, 23],
+    popupAnchor: [0, -21],
   });
 }
 
@@ -508,7 +566,7 @@ function initChatPolling(conversationId, sendUrl, messagesUrl) {
   const container = document.getElementById("chatMessages");
   const form = document.getElementById("chatForm");
   const input = document.getElementById("chatInput");
-  if (!container || !form || !input) return;
+  if (!container || !form || !input) return null;
 
   function lastMessageId() {
     let max = 0;
@@ -579,6 +637,8 @@ function initChatPolling(conversationId, sendUrl, messagesUrl) {
       body: `body=${encodeURIComponent(body)}`,
     }).then(poll);
   });
+
+  return { poll };
 }
 
 document.addEventListener("DOMContentLoaded", () => {

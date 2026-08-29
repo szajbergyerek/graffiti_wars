@@ -1,3 +1,4 @@
+from authlib.integrations.base_client.errors import OAuthError
 from flask import Blueprint, flash, redirect, url_for
 from flask_login import login_required, login_user, logout_user
 
@@ -87,7 +88,10 @@ def login():
 
 @bp_auth.route("/auth/google/callback")
 def google_callback():
-    token = oauth.google.authorize_access_token()
+    try:
+        token = oauth.google.authorize_access_token()
+    except OAuthError:
+        return redirect(url_for("profile.my_profile"))
     userinfo = token.get("userinfo")
 
     user, is_new_user = _find_or_create_user(

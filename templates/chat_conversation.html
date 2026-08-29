@@ -144,7 +144,7 @@
   }
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
-  initChatPolling(
+  const chatPoller = initChatPolling(
     chatConversationId,
     {{ url_for('chat.send_message', conversation_id=conversation.id) | tojson }},
     {{ url_for('chat.api_messages', conversation_id=conversation.id) | tojson }}
@@ -160,13 +160,7 @@
     const formData = new FormData();
     formData.append("image", file);
     fetch({{ url_for('chat.send_image', conversation_id=conversation.id) | tojson }}, { method: "POST", body: formData })
-      .then((r) => r.json())
-      .then((message) => {
-        if (message.id) {
-          appendChatMessage(chatMessages, message);
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-      });
+      .then(() => { if (chatPoller) chatPoller.poll(); });
     e.target.value = "";
   });
 
@@ -198,15 +192,10 @@
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: `lat=${pickedLat}&lon=${pickedLon}`,
-    })
-      .then((r) => r.json())
-      .then((message) => {
-        if (message.id) {
-          appendChatMessage(chatMessages, message);
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-          locationOverlay.classList.remove("open");
-        }
-      });
+    }).then(() => {
+      if (chatPoller) chatPoller.poll();
+      locationOverlay.classList.remove("open");
+    });
   });
 
   {% if conversation.kind == "band" %}
