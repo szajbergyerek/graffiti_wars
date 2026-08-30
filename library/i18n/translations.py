@@ -291,6 +291,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "hu": "Nem sikerült lekérni a helyzetedet. Engedélyezd a helymeghatározást a böngésző beállításaiban, majd próbáld újra.",
         "en": "Couldn't get your location. Allow location access in your browser settings and try again.",
     },
+    "tag.camera_tag_not_found": {"hu": "Tag nem található", "en": "Tag not found"},
+    "tag.camera_model_load_failed": {
+        "hu": "Nem sikerült betölteni a tag-felismerő modellt. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+        "en": "Couldn't load the tag-detection model. Check your internet connection and try again.",
+    },
+    "tag.camera_loading_model": {"hu": "Felismerő betöltése...", "en": "Loading detector..."},
     "tag.accept_button": {"hu": "Elfogadás", "en": "Accept"},
     "tag.processing_title": {"hu": "Feldolgozás...", "en": "Processing..."},
     "tag.processing_message": {

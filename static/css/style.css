@@ -522,6 +522,29 @@ input:focus, select:focus, textarea:focus {
 }
 .camera-status-banner.visible { display: block; }
 
+.detection-overlay {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+.tag-not-found-banner {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: calc(env(safe-area-inset-top) + 14px) 16px 12px;
+  background: rgba(255, 59, 48, 0.92);
+  color: #fff;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  z-index: 6;
+  display: none;
+}
+
+.camera-wrap.no-tag-detected {
+  box-shadow: inset 0 0 0 2px rgba(255, 59, 48, 0.95);
+}
+
+.camera-wrap.no-tag-detected .tag-not-found-banner { display: block; }
+
 /* ---------- Checkboxes / radios / color swatches ---------- */
 
 input[type="checkbox"] {
