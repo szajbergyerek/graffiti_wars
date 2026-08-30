@@ -52,11 +52,13 @@
         <a href="{{ url_for('bands.band_settings', band_id=band.id) }}" class="btn btn-secondary">{{ t('band.settings_button') }}</a>
         {% endif %}
         <form method="POST" action="{{ url_for('bands.leave_band') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <button class="btn btn-secondary">{{ t('band.leave_button') }}</button>
         </form>
       </div>
     {% elif current_user.is_civilian and band.join_policy == "open" %}
       <form method="POST" action="{{ url_for('bands.join_band', band_id=band.id) }}" class="mb-32">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <button class="btn btn-primary btn-block">{{ t('band.join_button') }}</button>
       </form>
     {% elif current_user.is_civilian and band.join_policy == "request" %}
@@ -64,6 +66,7 @@
         <p class="mb-32 text-muted text-center">{{ t('band.request_pending') }}</p>
       {% else %}
         <form method="POST" action="{{ url_for('bands.request_join', band_id=band.id) }}" class="mb-32">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <button class="btn btn-primary btn-block">{{ t('band.request_join_button') }}</button>
         </form>
       {% endif %}
@@ -78,9 +81,11 @@
       <a href="{{ url_for('profile.user_profile', username=join_request.user.username) }}">{{ join_request.user.username }}</a>
       <div class="flex gap-8">
         <form method="POST" action="{{ url_for('bands.approve_join_request', request_id=join_request.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <button class="btn btn-success btn-sm">{{ t('band.approve_request') }}</button>
         </form>
         <form method="POST" action="{{ url_for('bands.reject_join_request', request_id=join_request.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <button class="btn btn-danger btn-sm">{{ t('band.reject_request') }}</button>
         </form>
       </div>
@@ -95,6 +100,7 @@
   <div class="card mb-32">
     <h2 style="font-size:16px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.add_member_title') }}</h2>
     <form method="POST" action="{{ url_for('bands.add_member', band_id=band.id) }}" class="flex gap-8">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <input type="text" name="username" placeholder="{{ t('band.add_member_placeholder') }}" required />
       <button type="submit" class="btn btn-primary">{{ t('band.add_member_button') }}</button>
     </form>
@@ -159,6 +165,7 @@
         actionCell = `<td>${
           member.can_kick
             ? `<form method="POST" action="/bands/${bandDetailId}/members/${member.user_id}/kick" data-confirm-kick="1">
+                 <input type="hidden" name="csrf_token" value="${escapeHtml(getCsrfToken())}" />
                  <button class="btn btn-danger btn-sm">${escapeHtml(bandKickButtonLabel)}</button>
                </form>`
             : ""

@@ -1,5 +1,74 @@
 // Graffiti Wars - client-side helpers backed by the real /api endpoints
 
+// Every fetch() POST/PUT/PATCH/DELETE call in this app needs a CSRF token
+// (Flask-WTF's CSRFProtect rejects same-origin state-changing requests
+// without one) - rather than adding it by hand at every call site, this
+// patches window.fetch once so it's attached automatically, the same way a
+// plain <form> submission gets it from a hidden input field instead.
+(() => {
+  const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  const csrfToken = csrfMeta ? csrfMeta.content : null;
+  if (!csrfToken) return;
+
+  const originalFetch = window.fetch.bind(window);
+  const stateChangingMethods = ["POST", "PUT", "PATCH", "DELETE"];
+
+  function isSameOrigin(url) {
+    try {
+      return new URL(url, window.location.href).origin === window.location.origin;
+    } catch (err) {
+      return true;
+    }
+  }
+
+  window.fetch = (input, init = {}) => {
+    const method = (init.method || (input instanceof Request ? input.method : "GET") || "GET").toUpperCase();
+    const url = input instanceof Request ? input.url : input;
+    if (!stateChangingMethods.includes(method) || !isSameOrigin(url)) {
+      return originalFetch(input, init);
+    }
+
+    const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+    if (!headers.has("X-CSRFToken")) headers.set("X-CSRFToken", csrfToken);
+    return originalFetch(input, { ...init, headers });
+  };
+})();
+
+function initCookieBanner() {
+  const banner = document.getElementById("cookieBanner");
+  const acceptBtn = document.getElementById("cookieBannerAccept");
+  if (!banner || !acceptBtn) return;
+
+  const STORAGE_KEY = "cookie_banner_dismissed";
+  let alreadyDismissed = false;
+  try {
+    alreadyDismissed = localStorage.getItem(STORAGE_KEY) === "1";
+  } catch (err) {
+    alreadyDismissed = false;
+  }
+
+  if (!alreadyDismissed) banner.classList.add("visible");
+
+  acceptBtn.addEventListener("click", () => {
+    banner.classList.remove("visible");
+    try {
+      localStorage.setItem(STORAGE_KEY, "1");
+    } catch (err) {
+      // Private-browsing/storage-blocked contexts just won't remember the
+      // choice across visits - the banner re-appearing next time is a
+      // reasonable fallback, not worth failing loudly over.
+    }
+  });
+}
+
+// For POST forms built dynamically as HTML strings (admin/band member
+// lists, etc.) rather than rendered by Jinja - those need the CSRF token
+// baked in as a hidden field too, same as any other <form method="POST">.
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.content : "";
+}
+
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text == null ? "" : String(text);
@@ -643,6 +712,7 @@ function initChatPolling(conversationId, sendUrl, messagesUrl) {
 
 document.addEventListener("DOMContentLoaded", () => {
   autoHideFlashes();
+  initCookieBanner();
 
   document.querySelectorAll("[data-init-map]").forEach((el) => {
     initLiveMap(el.id, {

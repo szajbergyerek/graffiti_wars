@@ -1,5 +1,5 @@
 from authlib.integrations.base_client.errors import OAuthError
-from flask import Blueprint, flash, redirect, url_for
+from flask import Blueprint, flash, redirect, session, url_for
 from flask_login import login_required, login_user, logout_user
 
 from library.extensions import db, login_manager, oauth
@@ -106,7 +106,8 @@ def google_callback():
         flash(t("flash.account_banned"), "error")
         return redirect(url_for("index.index"))
 
-    login_user(user)
+    session.permanent = True
+    login_user(user, remember=True)
     if is_new_user:
         return redirect(url_for("profile.my_profile"))
     return redirect(url_for("tags.map_view"))

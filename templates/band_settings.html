@@ -12,6 +12,7 @@
   <h1 style="font-size:26px; font-family:var(--font-body); font-weight:800" class="mb-24">{{ t('band.settings_title') }} - {{ band.name }}</h1>
 
   <form method="POST" enctype="multipart/form-data" class="card mb-24">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <div class="field">
       <label>{{ t('band.field_description') }}</label>
       <textarea name="description" rows="3">{{ band.description or "" }}</textarea>
@@ -88,6 +89,7 @@
   </div>
 
   <form method="POST" action="{{ url_for('bands.disband_band', band_id=band.id) }}" id="disbandForm" style="margin-bottom:80px">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <button type="submit" class="btn btn-danger btn-block">{{ t('band.disband_button') }}</button>
   </form>
 </div>
@@ -121,6 +123,7 @@
         <td>${
           member.can_kick
             ? `<form method="POST" action="/bands/${settingsBandId}/members/${member.user_id}/kick" data-confirm-kick="1">
+                 <input type="hidden" name="csrf_token" value="${escapeHtml(getCsrfToken())}" />
                  <button class="btn btn-danger btn-sm">${escapeHtml(settingsKickButtonLabel)}</button>
                </form>`
             : ""

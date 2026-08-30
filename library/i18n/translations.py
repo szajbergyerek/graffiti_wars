@@ -22,6 +22,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "nav.logout": {"hu": "Kilépés", "en": "Log out"},
     "nav.login": {"hu": "Belépés", "en": "Log in"},
 
+    # ---------- Cookie banner ----------
+    "cookie_banner.message": {
+        "hu": "Ez az oldal a bejelentkezés és a böngészés működéséhez szükséges sütiket használ. Ezek elengedhetetlenek az oldal működéséhez.",
+        "en": "This site uses cookies required for login and browsing to work. These are essential and can't be turned off.",
+    },
+    "cookie_banner.accept_button": {"hu": "Rendben", "en": "Got it"},
+
     # ---------- Footer ----------
     "footer.rights": {
         "hu": "© 2026 Graffiti Wars. A feltöltött tartalomért a feltöltő felel.",

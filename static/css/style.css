@@ -1041,6 +1041,33 @@ a.list-cell, button.list-cell {
 
 /* ---------- Flash messages ---------- */
 
+.cookie-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  top: calc(env(safe-area-inset-top) + 12px);
+  z-index: 1600;
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  background: rgba(19, 19, 25, 0.97);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+
+.cookie-banner.visible { display: flex; }
+
+.cookie-banner p {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .flash-wrap {
   position: fixed;
   top: calc(env(safe-area-inset-top) + 60px);

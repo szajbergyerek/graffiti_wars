@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="csrf-token" content="{{ csrf_token() }}" />
 <title>{% block title %}Graffiti Wars{% endblock %}</title>
 <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -55,6 +56,11 @@
 {% block content %}{% endblock %}
 </main>
 
+<div class="cookie-banner" id="cookieBanner">
+  <p>{{ t('cookie_banner.message') }}</p>
+  <button type="button" class="btn btn-primary btn-sm" id="cookieBannerAccept">{{ t('cookie_banner.accept_button') }}</button>
+</div>
+
 {% block tab_bar %}
 {% set profile_active = request.endpoint and (request.endpoint.startswith('profile.') or request.endpoint.startswith('chat.') or request.endpoint.startswith('admin.') or request.endpoint == 'auth.logout') %}
 <nav class="tab-bar">
@@ -95,6 +101,14 @@
 {% endblock %}
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% if current_user.is_authenticated and not current_user.is_civilian %}
+<script>
+  // Warms the browser's HTTP cache with the tag-detection model in the
+  // background, so by the time a gang member opens the camera it's already
+  // local instead of needing a ~12MB download right at that moment.
+  fetch({{ url_for('static', filename='models/tag_detector.onnx') | tojson }}, { credentials: "omit" }).catch(() => {});
+</script>
+{% endif %}
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>

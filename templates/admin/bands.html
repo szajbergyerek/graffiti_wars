@@ -41,6 +41,7 @@
         <td>${band.area_km2} km2</td>
         <td>
           <form method="POST" action="/admin/bands/${band.band_id}/delete" data-confirm-delete="1">
+            <input type="hidden" name="csrf_token" value="${escapeHtml(getCsrfToken())}" />
             <button class="btn btn-danger btn-sm">${escapeHtml(adminBandsDeleteLabel)}</button>
           </form>
         </td>

@@ -17,6 +17,7 @@
   </div>
 
   <form method="POST" class="card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     {% for setting in settings %}
     <div class="field">
       <label for="setting_{{ setting.key }}">{{ setting.label }}</label>

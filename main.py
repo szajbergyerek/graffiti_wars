@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from dotenv import load_dotenv
 from flask import Flask, g, request
@@ -19,7 +20,7 @@ from endpoints.profile import bp_profile
 from endpoints.tags import bp_tags
 from endpoints.tutorial import bp_tutorial
 from library.config import Config
-from library.extensions import db, login_manager, oauth
+from library.extensions import csrf, db, login_manager, oauth
 from library.i18n.countries import COUNTRY_BY_CODE
 from library.services.color_utils import contrast_shade, hex_to_rgba
 from library.services.translator import t, translator
@@ -42,10 +43,22 @@ def create_app() -> Flask:
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["MAX_CONTENT_LENGTH"] = config.max_content_length
     app.config["IMAGES_ROOT"] = config.images_root
+    # Static files (notably the ~12MB tag-detection model) default to a
+    # revalidate-every-time cache policy, meaning a network round-trip on
+    # every load even when the content hasn't changed. A day-long cache lets
+    # a returning band member's browser skip that entirely.
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 86400
+    # "Remember me" is not optional here - every login stays signed in until
+    # an explicit logout, so both the underlying session and Flask-Login's
+    # remember-me cookie need a long lifetime instead of the default
+    # expire-when-the-browser-closes behavior.
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=365)
+    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=365)
 
     db.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
+    csrf.init_app(app)
 
     oauth.init_app(app)
     oauth.register(

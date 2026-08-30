@@ -12,6 +12,7 @@
   <p class="mb-24">{{ t('tag.search_help') }}</p>
 
   <form method="POST" enctype="multipart/form-data" class="card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <div class="field mb-24">
       <label>{{ t('tag.search_field_photo') }}</label>
       <label class="dropzone" for="searchPhotoInput">

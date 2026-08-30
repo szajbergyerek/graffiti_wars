@@ -17,6 +17,7 @@
   <p class="mb-24">{{ tag_point.description }}</p>
   {% elif current_user.is_authenticated and current_user.id == tag_point.submitted_by_id %}
   <form method="POST" action="{{ url_for('tags.update_description', tag_id=tag_point.id) }}" class="mb-24">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <textarea name="description" rows="2" maxlength="500" placeholder="{{ t('tag.description_placeholder') }}"></textarea>
     <button type="submit" class="btn btn-secondary btn-sm" style="margin-top:8px">{{ t('tag.description_save_button') }}</button>
   </form>
@@ -66,6 +67,7 @@
       <button type="button" class="modal-close" onclick="toggleModal('reportModalBackdrop')">&times;</button>
     </div>
     <form method="POST" action="{{ url_for('tags.report_tag', tag_id=tag_point.id) }}" id="reportTagForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <div class="flex gap-8" style="flex-direction:column">
         <button type="submit" name="reason" value="{{ t('tag.report_reason_not_tag') }}" class="btn btn-secondary btn-block">{{ t('tag.report_reason_not_tag') }}</button>
         <button type="submit" name="reason" value="{{ t('tag.report_reason_missing') }}" class="btn btn-secondary btn-block">{{ t('tag.report_reason_missing') }}</button>

@@ -48,6 +48,7 @@
         </td>
         <td>
           <form method="POST" action="/admin/users/${user.user_id}/toggle-ban">
+            <input type="hidden" name="csrf_token" value="${escapeHtml(getCsrfToken())}" />
             <button class="btn btn-sm ${user.is_banned ? "btn-success" : "btn-danger"}">
               ${escapeHtml(user.is_banned ? usersUnbanLabel : usersBanLabel)}
             </button>

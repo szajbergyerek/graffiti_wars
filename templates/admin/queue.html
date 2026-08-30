@@ -42,10 +42,12 @@
         <td>${escapeHtml(report.reason || "-")}</td>
         <td class="flex gap-8">
           <form method="POST" action="/admin/reports/${report.report_id}/resolve">
+            <input type="hidden" name="csrf_token" value="${escapeHtml(getCsrfToken())}" />
             <input type="hidden" name="action" value="remove_tag" />
             <button class="btn btn-danger btn-sm">${escapeHtml(queueRemoveTagLabel)}</button>
           </form>
           <form method="POST" action="/admin/reports/${report.report_id}/resolve">
+            <input type="hidden" name="csrf_token" value="${escapeHtml(getCsrfToken())}" />
             <input type="hidden" name="action" value="dismiss" />
             <button class="btn btn-secondary btn-sm">${escapeHtml(queueDismissLabel)}</button>
           </form>

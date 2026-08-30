@@ -10,6 +10,7 @@
 {% block content %}
 <div class="container section section-with-header-buttons" style="max-width:560px">
   <form method="POST" enctype="multipart/form-data" class="card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
     <div class="field">
       <label>{{ t('profile.field_username') }}</label>
       <input type="text" name="username" value="{{ current_user.username }}" minlength="3" maxlength="24" required />
