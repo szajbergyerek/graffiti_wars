@@ -13,6 +13,11 @@
 <div class="camera-wrap" id="cameraWrap">
   <video id="cameraVideo" class="camera-video" autoplay playsinline muted></video>
   <canvas id="detectionOverlay" class="detection-overlay"></canvas>
+  <div class="confidence-meter" id="confidenceMeter">
+    <div class="confidence-meter-pointer" id="confidenceMeterPointer">
+      <span class="confidence-meter-pointer-arrow"></span>
+    </div>
+  </div>
   <div class="tag-not-found-banner" id="tagNotFoundBanner">{{ t('tag.camera_tag_not_found') }}</div>
   <div class="camera-status-banner" id="statusBanner"></div>
   <div class="camera-shutter-row">
@@ -31,6 +36,8 @@
   const statusBanner = document.getElementById("statusBanner");
   const overlayCanvas = document.getElementById("detectionOverlay");
   const overlayCtx = overlayCanvas.getContext("2d");
+  const confidenceMeter = document.getElementById("confidenceMeter");
+  const confidenceMeterPointer = document.getElementById("confidenceMeterPointer");
 
   const MODEL_URL = {{ url_for('static', filename='models/tag_detector.onnx') | tojson }};
   const MODEL_SIZE = 640;
@@ -183,10 +190,20 @@
   // Darkens the whole frame except the detected tag's area, which stays at
   // full brightness - a punched-out hole in a semi-transparent dark layer -
   // outlined in gray, with crosshair guide lines running from the box's
-  // edges out to the frame edges (not through the box itself).
+  // edges out to the frame edges (not through the box itself). When nothing
+  // is detected, draws a thin red border instead - drawn on the canvas
+  // (rather than as a CSS box-shadow on the wrapper) because the video and
+  // this same canvas are opaque, full-bleed siblings that would otherwise
+  // completely paint over a border applied to their parent.
   function drawOverlay(rect) {
     overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-    if (!rect) return;
+
+    if (!rect) {
+      overlayCtx.strokeStyle = "rgba(255, 59, 48, 0.95)";
+      overlayCtx.lineWidth = 3;
+      overlayCtx.strokeRect(1.5, 1.5, overlayCanvas.width - 3, overlayCanvas.height - 3);
+      return;
+    }
 
     overlayCtx.fillStyle = "rgba(0, 0, 0, 0.55)";
     overlayCtx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height);
@@ -214,6 +231,23 @@
     overlayCtx.stroke();
   }
 
+  // Fixed red-yellow-green confidence bar at top-center of the screen, with
+  // a pointer that slides along it to the model's confidence. The bar's low
+  // end represents CONF_THRESHOLD, not 0 - a detection below the threshold
+  // never shows the bar at all, so anchoring the scale there means the
+  // pointer actually uses the bar's full width instead of being squeezed
+  // into whatever fraction is above the threshold.
+  function updateConfidenceMeter(confidence) {
+    if (confidence == null) {
+      confidenceMeter.classList.remove("visible");
+      return;
+    }
+    confidenceMeter.classList.add("visible");
+    const normalized = (confidence - CONF_THRESHOLD) / (1 - CONF_THRESHOLD);
+    const percent = Math.max(0, Math.min(1, normalized)) * 100;
+    confidenceMeterPointer.style.left = `${percent}%`;
+  }
+
   let currentDetection = null;
   let capturing = false;
   let detecting = false;
@@ -236,9 +270,11 @@
     syncOverlaySize();
     if (currentDetection) {
       drawOverlay(toDisplayRect(currentDetection));
+      updateConfidenceMeter(currentDetection.conf);
       wrap.classList.remove("no-tag-detected");
     } else {
       drawOverlay(null);
+      updateConfidenceMeter(null);
       wrap.classList.add("no-tag-detected");
     }
     if (!capturing) shutterBtn.disabled = !currentDetection;
