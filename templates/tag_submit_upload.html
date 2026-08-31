@@ -18,7 +18,7 @@
       <span class="confidence-meter-pointer-arrow"></span>
     </div>
   </div>
-  <div class="tag-not-found-banner" id="tagNotFoundBanner">{{ t('tag.camera_tag_not_found') }}</div>
+  <div class="camera-guidance-banner visible" id="guidanceBanner">{{ t('tag.camera_loading_model') }}</div>
   <div class="camera-status-banner" id="statusBanner"></div>
   <div class="camera-shutter-row">
     <button type="button" id="shutterBtn" class="camera-shutter-btn" aria-label="{{ t('tag.camera_shutter') }}" disabled></button>
@@ -38,15 +38,32 @@
   const overlayCtx = overlayCanvas.getContext("2d");
   const confidenceMeter = document.getElementById("confidenceMeter");
   const confidenceMeterPointer = document.getElementById("confidenceMeterPointer");
+  const guidanceBanner = document.getElementById("guidanceBanner");
 
   const MODEL_URL = {{ url_for('assets.serve_model', relative_path='tag_detector.onnx') | tojson }};
   const MODEL_SIZE = 640;
   const CONF_THRESHOLD = 0.5;
   const DETECTION_INTERVAL_MS = 350;
+  const MIN_TAG_AREA_FRACTION = 0.03; // tag smaller than this share of the frame -> too far away
+  // The target square sits in a fixed spot at the center of the frame - it
+  // never moves to track the detection, the user moves the phone instead.
+  const TARGET_SQUARE_FRACTION = 0.62;
+  const SQUARE_CORNER_RADIUS = 28;
+  // DEBUG_SHOW_DETECTION_BOX draws the raw detection box (dashed) for
+  // testing - remove once the detection tuning is done.
+  const DEBUG_SHOW_DETECTION_BOX = true;
+  const SQUARE_BORDER_COLORS = {
+    gray: "rgba(210, 210, 210, 0.9)",
+    red: "rgba(255, 59, 48, 0.95)",
+    green: "rgba(52, 199, 89, 0.95)",
+  };
 
   const mapUrl = {{ url_for('tags.map_view') | tojson }};
   const backButtonText = {{ t('tag.camera_back_button') | tojson }};
   const locationUnavailableText = {{ t('tag.location_unavailable') | tojson }};
+  const guidanceNoTagText = {{ t('tag.camera_guidance_no_tag') | tojson }};
+  const guidancePlaceInAreaText = {{ t('tag.camera_guidance_place_in_area') | tojson }};
+  const guidanceMoveCloserText = {{ t('tag.camera_guidance_move_closer') | tojson }};
 
   function showMessage(text) {
     wrap.innerHTML =
@@ -81,7 +98,13 @@
     else video.addEventListener("loadeddata", resolve, { once: true });
   });
 
-  showBanner({{ t('tag.camera_loading_model') | tojson }});
+  syncOverlaySize();
+  drawOverlay(getTargetSquare(), "gray");
+
+  // The guidance banner already shows the "loading detector" text (set
+  // server-side in the initial HTML) - detectionTick() below swaps it to the
+  // live detection guidance the moment it starts running, so there's no gap
+  // where both a loading message and a detection message could show at once.
   let session;
   try {
     ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/";
@@ -90,7 +113,6 @@
     showMessage({{ t('tag.camera_model_load_failed') | tojson }});
     return;
   }
-  hideBanner();
 
   // Offscreen canvas used to letterbox-resize each frame to the model's
   // fixed 640x640 input before running inference.
@@ -187,48 +209,62 @@
     }
   }
 
-  // Darkens the whole frame except the detected tag's area, which stays at
-  // full brightness - a punched-out hole in a semi-transparent dark layer -
-  // outlined in gray, with crosshair guide lines running from the box's
-  // edges out to the frame edges (not through the box itself). When nothing
-  // is detected, draws a thin red border instead - drawn on the canvas
-  // (rather than as a CSS box-shadow on the wrapper) because the video and
-  // this same canvas are opaque, full-bleed siblings that would otherwise
-  // completely paint over a border applied to their parent.
-  function drawOverlay(rect) {
-    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  function getTargetSquare() {
+    const size = Math.min(overlayCanvas.width, overlayCanvas.height) * TARGET_SQUARE_FRACTION;
+    return {
+      x: (overlayCanvas.width - size) / 2,
+      y: (overlayCanvas.height - size) / 2,
+      w: size,
+      h: size,
+    };
+  }
 
-    if (!rect) {
-      overlayCtx.strokeStyle = "rgba(255, 59, 48, 0.95)";
-      overlayCtx.lineWidth = 3;
-      overlayCtx.strokeRect(1.5, 1.5, overlayCanvas.width - 3, overlayCanvas.height - 3);
-      return;
-    }
+  // A detection "counts" only if its entire box fits inside the fixed target
+  // square - a box that pokes out past any edge (even if smaller than the
+  // square and roughly centered) doesn't enable the shutter.
+  function isFullyInsideSquare(displayRect, square) {
+    return (
+      displayRect.x >= square.x &&
+      displayRect.y >= square.y &&
+      displayRect.x + displayRect.w <= square.x + square.w &&
+      displayRect.y + displayRect.h <= square.y + square.h
+    );
+  }
+
+  // Darkens the whole frame except the fixed target square, which stays at
+  // full brightness - a punched-out, rounded-corner hole in a semi-transparent
+  // dark layer - outlined gray before detection starts (model still loading),
+  // green when a tag is centered inside it, red otherwise. Drawn on the
+  // canvas (rather than as a CSS box-shadow on the wrapper) because the
+  // video and this same canvas are opaque, full-bleed siblings that would
+  // otherwise completely paint over a border applied to their parent.
+  function drawOverlay(square, state, debugDisplayRect) {
+    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
     overlayCtx.fillStyle = "rgba(0, 0, 0, 0.55)";
     overlayCtx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
     overlayCtx.save();
     overlayCtx.globalCompositeOperation = "destination-out";
-    overlayCtx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    overlayCtx.beginPath();
+    overlayCtx.roundRect(square.x, square.y, square.w, square.h, SQUARE_CORNER_RADIUS);
+    overlayCtx.fill();
     overlayCtx.restore();
 
-    overlayCtx.strokeStyle = "rgba(210, 210, 210, 0.9)";
-    overlayCtx.lineWidth = 2;
-    overlayCtx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-
-    const centerX = rect.x + rect.w / 2;
-    const centerY = rect.y + rect.h / 2;
+    overlayCtx.strokeStyle = SQUARE_BORDER_COLORS[state];
+    overlayCtx.lineWidth = 3;
     overlayCtx.beginPath();
-    overlayCtx.moveTo(centerX, 0);
-    overlayCtx.lineTo(centerX, rect.y);
-    overlayCtx.moveTo(centerX, rect.y + rect.h);
-    overlayCtx.lineTo(centerX, overlayCanvas.height);
-    overlayCtx.moveTo(0, centerY);
-    overlayCtx.lineTo(rect.x, centerY);
-    overlayCtx.moveTo(rect.x + rect.w, centerY);
-    overlayCtx.lineTo(overlayCanvas.width, centerY);
+    overlayCtx.roundRect(square.x, square.y, square.w, square.h, SQUARE_CORNER_RADIUS);
     overlayCtx.stroke();
+
+    if (DEBUG_SHOW_DETECTION_BOX && debugDisplayRect) {
+      overlayCtx.save();
+      overlayCtx.strokeStyle = "rgba(255, 204, 0, 0.95)";
+      overlayCtx.lineWidth = 2;
+      overlayCtx.setLineDash([8, 6]);
+      overlayCtx.strokeRect(debugDisplayRect.x, debugDisplayRect.y, debugDisplayRect.w, debugDisplayRect.h);
+      overlayCtx.restore();
+    }
   }
 
   // Fixed red-yellow-green confidence bar at top-center of the screen, with
@@ -248,6 +284,15 @@
     confidenceMeterPointer.style.left = `${percent}%`;
   }
 
+  function setGuidanceText(text) {
+    if (text == null) {
+      guidanceBanner.classList.remove("visible");
+      return;
+    }
+    guidanceBanner.textContent = text;
+    guidanceBanner.classList.add("visible");
+  }
+
   let currentDetection = null;
   let capturing = false;
   let detecting = false;
@@ -260,22 +305,40 @@
   async function detectionTick() {
     if (capturing || detecting) return;
     detecting = true;
+    let detection = null;
     try {
-      currentDetection = await detectBestTag();
+      detection = await detectBestTag();
     } catch (err) {
-      currentDetection = null;
+      detection = null;
     }
     detecting = false;
 
     syncOverlaySize();
-    if (currentDetection) {
-      drawOverlay(toDisplayRect(currentDetection));
+    const square = getTargetSquare();
+    const displayRect = detection ? toDisplayRect(detection) : null;
+    const inArea = displayRect != null && isFullyInsideSquare(displayRect, square);
+    const areaFraction = detection
+      ? ((detection.x2 - detection.x1) * (detection.y2 - detection.y1)) / (video.videoWidth * video.videoHeight)
+      : 0;
+    const tagFound = inArea && areaFraction >= MIN_TAG_AREA_FRACTION;
+    currentDetection = tagFound ? detection : null;
+
+    let guidanceText;
+    if (!detection) {
+      guidanceText = guidanceNoTagText;
+    } else if (!inArea) {
+      guidanceText = guidancePlaceInAreaText;
+    } else if (areaFraction < MIN_TAG_AREA_FRACTION) {
+      guidanceText = guidanceMoveCloserText;
+    }
+
+    drawOverlay(square, tagFound ? "green" : "red", displayRect);
+    if (tagFound) {
       updateConfidenceMeter(currentDetection.conf);
-      wrap.classList.remove("no-tag-detected");
+      setGuidanceText(null);
     } else {
-      drawOverlay(null);
       updateConfidenceMeter(null);
-      wrap.classList.add("no-tag-detected");
+      setGuidanceText(guidanceText);
     }
     if (!capturing) shutterBtn.disabled = !currentDetection;
   }
