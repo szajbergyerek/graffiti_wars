@@ -53,6 +53,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "title.admin_users": {"hu": "Felhasználók", "en": "Users"},
     "title.admin_bands": {"hu": "Bandák kezelése", "en": "Manage gangs"},
     "title.admin_settings": {"hu": "Beállítások", "en": "Settings"},
+    "title.admin_model": {"hu": "Detektor modell", "en": "Detector model"},
 
     # ---------- Home page ----------
     "home.hero_title": {
@@ -358,6 +359,26 @@ STRINGS: dict[str, dict[str, str]] = {
     "admin.nav_settings": {"hu": "Beállítások", "en": "Settings"},
     "admin.settings_save_button": {"hu": "Mentés", "en": "Save"},
     "flash.settings_saved": {"hu": "Beállítások elmentve.", "en": "Settings saved."},
+    "admin.nav_model": {"hu": "Modell", "en": "Model"},
+    "admin.model_current_label": {"hu": "Jelenlegi modell", "en": "Current model"},
+    "admin.model_size_label": {"hu": "Méret", "en": "Size"},
+    "admin.model_modified_label": {"hu": "Utoljára módosítva", "en": "Last modified"},
+    "admin.model_missing_label": {
+        "hu": "Nincs feltöltött modell - a tag-felismerés nem fog működni.",
+        "en": "No model uploaded - tag detection won't work.",
+    },
+    "admin.model_field_file": {"hu": "Modell fájl (.onnx)", "en": "Model file (.onnx)"},
+    "admin.model_upload_help": {
+        "hu": "A feltöltött fájl azonnal lecseréli az élesben használt detektor modellt.",
+        "en": "The uploaded file immediately replaces the live detection model.",
+    },
+    "admin.model_upload_button": {"hu": "Feltöltés", "en": "Upload"},
+    "flash.model_upload_missing": {"hu": "Nem választottál ki fájlt.", "en": "No file was selected."},
+    "flash.model_upload_invalid_type": {
+        "hu": "A fájlnak .onnx kiterjesztésűnek kell lennie.",
+        "en": "The file must have an .onnx extension.",
+    },
+    "flash.model_uploaded": {"hu": "A modell sikeresen feltöltve.", "en": "Model uploaded successfully."},
 
     "setting.tag_radius_meters_label": {"hu": "Tag hatósugara (m)", "en": "Tag radius (m)"},
     "setting.tag_radius_meters_description": {

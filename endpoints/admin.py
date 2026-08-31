@@ -1,7 +1,8 @@
+import os
 from datetime import datetime
 from functools import wraps
 
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -25,6 +26,8 @@ from library.services.translator import t
 bp_admin = Blueprint("admin", __name__, url_prefix="/admin")
 landmark_service = LandmarkService()
 settings_service = SettingsService()
+
+MODEL_FILENAME = "tag_detector.onnx"
 
 # Display order for the admin settings page - game-balance/anti-cheat values first, validation limits after.
 SETTINGS_DISPLAY_ORDER = [
@@ -271,3 +274,41 @@ def settings():
         for key in SETTINGS_DISPLAY_ORDER
     ]
     return render_template("admin/settings.html", settings=settings_list)
+
+
+@bp_admin.route("/model", methods=["GET", "POST"])
+@admin_required
+def model():
+    models_root = current_app.config["MODELS_ROOT"]
+    model_path = os.path.join(models_root, MODEL_FILENAME)
+
+    if request.method == "POST":
+        uploaded_file = request.files.get("model_file")
+        if uploaded_file is None or uploaded_file.filename == "":
+            flash(t("flash.model_upload_missing"), "error")
+            return redirect(url_for("admin.model"))
+
+        if not uploaded_file.filename.lower().endswith(".onnx"):
+            flash(t("flash.model_upload_invalid_type"), "error")
+            return redirect(url_for("admin.model"))
+
+        os.makedirs(models_root, exist_ok=True)
+        uploaded_file.save(model_path)
+
+        db.session.add(
+            AdminAction(
+                admin_id=current_user.id, action_type="update_model", target_description="Tag detection model"
+            )
+        )
+        db.session.commit()
+        flash(t("flash.model_uploaded"), "success")
+        return redirect(url_for("admin.model"))
+
+    model_info = None
+    if os.path.exists(model_path):
+        file_stat = os.stat(model_path)
+        model_info = {
+            "size_mb": round(file_stat.st_size / (1024 * 1024), 2),
+            "modified_at": datetime.fromtimestamp(file_stat.st_mtime),
+        }
+    return render_template("admin/model.html", model_info=model_info)
