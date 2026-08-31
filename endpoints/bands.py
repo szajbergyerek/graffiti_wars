@@ -51,8 +51,8 @@ def _query_bands(query_text, sort_key, scope, join_policy_filter, lat=None, lon=
     elif scope == "local":
         if lat is not None and lon is not None:
             local_band_ids = {
-                t.band_id
-                for t in leaderboard_service.local_ranking(
+                row.band.id
+                for row in leaderboard_service.local_band_ranking(
                     lat, lon, radius_km=settings_service.get("local_leaderboard_radius_km")
                 )
             }

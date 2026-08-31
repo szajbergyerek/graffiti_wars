@@ -16,6 +16,8 @@ def leaderboard_page():
 @bp_leaderboard.route("/api/leaderboard")
 def leaderboard_api():
     scope = request.args.get("scope", "global")
+    entity = request.args.get("entity", "band")
+    is_band = entity != "individual"
 
     if scope == "national":
         lat = request.args.get("lat", type=float)
@@ -25,31 +27,54 @@ def leaderboard_api():
         nationality_code = leaderboard_service.country_code_from_location(lat, lon)
         if not nationality_code:
             return jsonify({"error": "no_nationality"}), 400
-        territories = leaderboard_service.national_ranking(nationality_code)
+        rows = (
+            leaderboard_service.national_band_ranking(nationality_code)
+            if is_band
+            else leaderboard_service.national_user_ranking(nationality_code)
+        )
     elif scope == "local":
         lat = request.args.get("lat", type=float)
         lon = request.args.get("lon", type=float)
         if lat is None or lon is None:
             return jsonify({"error": "no_location"}), 400
-        territories = leaderboard_service.local_ranking(
-            lat, lon, radius_km=settings_service.get("local_leaderboard_radius_km")
+        radius_km = settings_service.get("local_leaderboard_radius_km")
+        rows = (
+            leaderboard_service.local_band_ranking(lat, lon, radius_km=radius_km)
+            if is_band
+            else leaderboard_service.local_user_ranking(lat, lon, radius_km=radius_km)
         )
     else:
-        territories = leaderboard_service.global_ranking()
+        rows = leaderboard_service.global_band_ranking() if is_band else leaderboard_service.global_user_ranking()
 
     offset = request.args.get("offset", type=int, default=0)
     limit = min(request.args.get("limit", type=int, default=10), 50)
-    page = territories[offset : offset + limit]
+    page = rows[offset : offset + limit]
+
+    if is_band:
+        return jsonify(
+            [
+                {
+                    "band_id": row.band.id,
+                    "band_name": row.band.name,
+                    "color": row.band.color,
+                    "tag_count": row.tag_count,
+                    "area_km2": round(row.territory.area_km2, 3) if row.territory else 0,
+                    "member_count": len(row.band.members),
+                }
+                for row in page
+            ]
+        )
 
     return jsonify(
         [
             {
-                "band_id": territory.band_id,
-                "band_name": territory.band.name,
-                "color": territory.band.color,
-                "area_km2": round(territory.area_km2, 3),
-                "member_count": len(territory.band.members),
+                "user_id": row.user.id,
+                "username": row.user.username,
+                "avatar_url": row.user.display_avatar_url,
+                "tag_count": row.tag_count,
+                "area_km2": round(row.territory.area_km2, 3) if row.territory else 0,
+                "band_name": row.user.band.name if row.user.band else None,
             }
-            for territory in page
+            for row in page
         ]
     )

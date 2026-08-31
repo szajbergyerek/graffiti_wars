@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ t('title.leaderboard') }} - Graffiti Wars{% endblock %}
+{% block title %}{{ t('title.leaderboard') }} - InkTrail{% endblock %}
 {% block header_title %}{{ t('title.leaderboard') }}{% endblock %}
 {% block extra_head %}
 <style>
@@ -7,10 +7,15 @@
   .lb-row-mine { background: rgba(255, 46, 108, 0.1); border-left: 3px solid var(--pink); padding-left: 13px; }
   .lb-row:last-child { border-bottom: none; }
   .lb-rank { font-family: var(--font-display); font-size: 18px; width: 28px; color: var(--text-faint); }
+  .lb-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 </style>
 {% endblock %}
 {% block content %}
 <div class="container section" style="max-width:640px">
+  <div class="segmented mb-16">
+    <div class="segmented-item active" data-entity="band">{{ t('leaderboard.entity_band') }}</div>
+    <div class="segmented-item" data-entity="individual">{{ t('leaderboard.entity_individual') }}</div>
+  </div>
   <div class="segmented mb-24">
     <div class="segmented-item active" data-scope="global">{{ t('leaderboard.tab_global') }}</div>
     <div class="segmented-item" data-scope="national">{{ t('leaderboard.tab_national') }}</div>
@@ -27,12 +32,17 @@
     noNationality: {{ t('leaderboard.no_nationality') | tojson }},
     requestingLocation: {{ t('leaderboard.requesting_location') | tojson }},
     locationDenied: {{ t('leaderboard.location_denied') | tojson }},
+    tagUnit: {{ t('leaderboard.tag_unit') | tojson }},
+    noCivilianHint: {{ t('leaderboard.no_civilian_hint') | tojson }},
   };
 
   const leaderboardContainer = document.getElementById("leaderboardResults");
   const myBandId = {{ current_user.band_id | tojson if current_user.is_authenticated else "null" }};
+  const myUserId = {{ current_user.id | tojson if current_user.is_authenticated else "null" }};
   let lbRank = 0;
   let lbActiveList = null;
+  let lbEntity = "band";
+  let lbScope = "global";
 
   function lbShowMessage(text) {
     if (lbActiveList) {
@@ -47,7 +57,7 @@
     leaderboardContainer.appendChild(p);
   }
 
-  function lbRenderRow(item) {
+  function lbRenderBandRow(item) {
     lbRank += 1;
     const row = document.createElement("div");
     row.className = "lb-row" + (myBandId && item.band_id === myBandId ? " lb-row-mine" : "");
@@ -76,16 +86,54 @@
     info.appendChild(link);
     info.appendChild(memberLine);
 
-    const area = document.createElement("div");
-    area.className = "badge";
-    area.style.background = `${item.color}22`;
-    area.style.color = item.color;
-    area.textContent = `${item.area_km2.toFixed(2)} km2`;
+    const count = document.createElement("div");
+    count.className = "badge";
+    count.style.background = `${item.color}22`;
+    count.style.color = item.color;
+    count.textContent = `${item.tag_count} ${lbMessages.tagUnit}`;
 
     row.appendChild(rank);
     row.appendChild(swatch);
     row.appendChild(info);
-    row.appendChild(area);
+    row.appendChild(count);
+    return row;
+  }
+
+  function lbRenderUserRow(item) {
+    lbRank += 1;
+    const row = document.createElement("div");
+    row.className = "lb-row" + (myUserId && item.user_id === myUserId ? " lb-row-mine" : "");
+
+    const rank = document.createElement("div");
+    rank.className = "lb-rank";
+    rank.textContent = lbRank;
+
+    const avatar = document.createElement("img");
+    avatar.className = "lb-avatar";
+    avatar.src = item.avatar_url;
+    avatar.alt = "";
+
+    const info = document.createElement("div");
+    info.style.flex = "1";
+    const link = document.createElement("a");
+    link.href = `/users/${item.username}`;
+    link.style.fontWeight = "700";
+    link.textContent = item.username;
+    const bandLine = document.createElement("div");
+    bandLine.className = "text-muted";
+    bandLine.style.fontSize = "13px";
+    bandLine.textContent = item.band_name || lbMessages.noCivilianHint;
+    info.appendChild(link);
+    info.appendChild(bandLine);
+
+    const count = document.createElement("div");
+    count.className = "badge";
+    count.textContent = `${item.tag_count} ${lbMessages.tagUnit}`;
+
+    row.appendChild(rank);
+    row.appendChild(avatar);
+    row.appendChild(info);
+    row.appendChild(count);
     return row;
   }
 
@@ -97,13 +145,16 @@
       emptyMessage: lbMessages.empty,
       pageSize: 10,
       fetchPage: (offset, limit) =>
-        fetch(`/api/leaderboard?${extraParams}&offset=${offset}&limit=${limit}`).then((r) => (r.ok ? r.json() : [])),
-      renderItem: lbRenderRow,
+        fetch(`/api/leaderboard?entity=${lbEntity}&${extraParams}&offset=${offset}&limit=${limit}`).then((r) =>
+          r.ok ? r.json() : []
+        ),
+      renderItem: lbEntity === "band" ? lbRenderBandRow : lbRenderUserRow,
     });
   }
 
   function lbLoadScope(scope) {
-    document.querySelectorAll(".segmented-item").forEach((tab) => tab.classList.toggle("active", tab.dataset.scope === scope));
+    lbScope = scope;
+    document.querySelectorAll("[data-scope]").forEach((tab) => tab.classList.toggle("active", tab.dataset.scope === scope));
 
     if (scope === "global") {
       lbStartInfiniteList("scope=global");
@@ -116,7 +167,7 @@
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const params = `scope=national&lat=${position.coords.latitude}&lon=${position.coords.longitude}`;
-          fetch(`/api/leaderboard?${params}&limit=1`).then((r) => {
+          fetch(`/api/leaderboard?entity=${lbEntity}&${params}&limit=1`).then((r) => {
             if (r.status === 400) {
               lbShowMessage(lbMessages.noNationality);
               return;
@@ -141,7 +192,15 @@
     }
   }
 
-  document.querySelectorAll(".segmented-item").forEach((tab) => {
+  document.querySelectorAll("[data-entity]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      lbEntity = tab.dataset.entity;
+      document.querySelectorAll("[data-entity]").forEach((t) => t.classList.toggle("active", t === tab));
+      lbLoadScope(lbScope);
+    });
+  });
+
+  document.querySelectorAll("[data-scope]").forEach((tab) => {
     tab.addEventListener("click", () => lbLoadScope(tab.dataset.scope));
   });
 

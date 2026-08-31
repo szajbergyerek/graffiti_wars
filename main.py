@@ -131,6 +131,7 @@ def create_app() -> Flask:
         from library.models.tag_report import TagReport
         from library.models.tag_visit import TagVisit
         from library.models.user import User
+        from library.models.user_territory import UserTerritory
 
         db.create_all()
 

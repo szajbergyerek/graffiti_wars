@@ -41,6 +41,7 @@ class User(db.Model, UserMixin):
     tag_points = db.relationship(
         "TagPoint", back_populates="submitted_by", foreign_keys="TagPoint.submitted_by_id"
     )
+    territory = db.relationship("UserTerritory", back_populates="user", uselist=False)
     avatar_image = db.relationship("Image", foreign_keys=[avatar_image_id])
     banner_image = db.relationship("Image", foreign_keys=[banner_image_id])
 

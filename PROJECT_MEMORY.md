@@ -6,36 +6,47 @@ without the user having to re-explain everything from scratch. It captures
 the full history of decisions, architecture, and open items as of the last
 session. **Read this file first before making changes.**
 
-This version supersedes an earlier revision of this file that predates the
-entire app-shell redesign and every feature round described below — if you
-find an older cached copy of this file anywhere, this one is current.
+This version supersedes an earlier revision of this file that predates
+everything described below from "Security hardening" onward — CSRF/session
+hardening, the live client-side tag-detection camera UI, `gradditi_ai`
+(YOLOv8 detection, a **different, newer** sub-project than the old
+`graffiti_wars_ai` DINOv2 idea this file used to describe — that old path no
+longer exists, see "AI / tag detection" below), rate limiting, image
+compression, band soft-delete, the tag-detail page rework, and a full
+security review with live penetration testing against the production
+deployment. If you find an older cached copy of this file anywhere, this one
+is current.
 
 ## What this project is
 
 A web game where crews ("bandák" in the Hungarian UI, "gangs" in English)
-claim real-world map territory by photographing graffiti tags at physical
-locations. A crew registers a reference tag image when it forms. Every
-submission is currently **auto-approved** (no real AI verification wired in
-yet — see "AI verification" below, this is being actively worked on as a
-separate sub-project). Approved tags cause the crew's territory to expand on
-a live map, and bands can reclaim contested ground from rivals (see
-"Territory algorithm").
+mark real-world map territory by photographing graffiti tags at physical
+locations, live in-camera (see "Tag submission flow" and "AI / tag
+detection" below). A crew registers a reference tag image when it forms.
+Every submission is currently **auto-approved** (no photo-vs-reference
+verification wired in yet). Approved tags cause the crew's territory to
+expand on a live map; **currently** this is still a competitive,
+contested-ground mechanic (see "Territory algorithm"), but **read
+"Planned future direction: InkTrail rework" below before extending that
+mechanic** — the user has decided to move away from the competitive framing
+and this may change significantly in a future session.
 
 The site is bilingual (Hungarian default, English fallback), mobile-first
 (a native app-shell UI: bottom tab bar, floating/embedded header buttons, no
-top navbar, no marketing landing page), and self-hosted on the user's home
-server via Docker/Portainer.
+top navbar, no marketing landing page, pinch-zoom disabled at the viewport
+level so it doesn't fight with the Leaflet map's own zoom), and self-hosted
+on the user's home server via Docker/Portainer.
 
 **Live deployment**: `https://graffiti.balintdaniel.com/` (nginx proxy
-manager in front, forwards to `10.20.30.45:2432`). See "Docker deployment"
-below for the full stack.
+manager in front, forwards to `10.20.30.45:2432`). HTTP→HTTPS redirect and
+HSTS were enabled at the nginx layer during this session (previously HTTP
+served the full site in the clear — see "Security hardening"). See "Docker
+deployment" below for the full stack.
 
-**Note the folder name**: the Flask project directory is `graffity_wars`
-(typo, missing an "i") — this is intentional/historical, a rename was
-requested once but blocked by a VS Code file lock and never retried. Don't
-"fix" the folder name unasked. The separate AI sub-project (see below) uses
-the correct spelling, `graffiti_wars_ai`, which is a different, deliberate
-project the user created later.
+**Folder name note (corrected)**: an earlier revision of this file claimed
+the Flask project directory was misspelled `graffity_wars` — that is **no
+longer true**, the folder is correctly `graffiti_wars` as of this session.
+Don't go looking for a typo'd folder.
 
 ## Tech stack
 
@@ -46,14 +57,30 @@ project the user created later.
   `url_for(..., _external=True)` generates correct `https://` URLs (needed
   for the Google OAuth redirect_uri; see "Known bugs fixed")
 - **Auth**: Google OAuth 2.0 / OpenID Connect via Authlib — **no password
-  login exists**, accounts are created on first Google sign-in
+  login exists**, accounts are created on first Google sign-in. Login is
+  permanent (`remember=True`, `session.permanent = True`,
+  `PERMANENT_SESSION_LIFETIME`/`REMEMBER_COOKIE_DURATION` = 365 days) — see
+  "Security hardening".
+- **CSRF**: Flask-WTF's `CSRFProtect`, global (`library/extensions.py`'s
+  `csrf` singleton). See "Security hardening" for how every form/fetch call
+  in the whole app was patched to carry a token.
 - **Geometry**: Shapely + pyproj (territory polygons, clustering, distance math)
-- **Images**: Pillow (EXIF reading, placeholder image generation for seed data)
+- **Images**: Pillow — now does real decode/re-encode/compression on every
+  upload, not just EXIF reading (see "Image handling" below; the old
+  `ExifExtractor` was already removed in an earlier round and stays removed)
+- **Client-side ML**: onnxruntime-web (CDN, WASM backend) runs a YOLOv8n
+  object-detection model **in the browser** on the tag-submission camera
+  page, gating the shutter button on whether a tag is actually in frame —
+  see "AI / tag detection" below. This is separate from (and much further
+  along than) the old DINOv2 photo-matching idea this file used to describe.
 - **Maps**: Leaflet.js + standard OpenStreetMap raster tiles, dark-themed via
   a CSS `filter: invert(1) hue-rotate(180deg) ...` on the tile images
   (`.map-tiles-dark img.leaflet-tile` in `style.css`) — **not** a different
   tile provider. This choice has history, see "Map tiles decision" below.
-- **External API**: Overpass API (`overpass-api.de`) for OSM landmark data
+- **External APIs**: Overpass API (`overpass-api.de`) for OSM landmark data;
+  **Nominatim** (`nominatim.openstreetmap.org/reverse`) — new this session,
+  used to reverse-geocode a viewer's live GPS position into a country code
+  for the leaderboard's "Nationality" scope (see "Leaderboard" below).
 - **i18n**: a single Python dict (`library/i18n/translations.py`) with every
   UI string in `hu` and `en` side by side — no framework, custom `Translator`
   class + `t()` helper
@@ -63,21 +90,27 @@ project the user created later.
 ## Repo layout
 
 ```
-main.py                     # App factory, registers all blueprints, db.create_all()
+main.py                     # App factory, registers all blueprints, db.create_all(),
+                             # idempotent ALTER TABLE migrations, CSRF init, security headers
 seed_data.py                 # Wipes DB, generates 1111 users / 125 bands / ~3200 tags
 Dockerfile                  # gunicorn --preload production image
 docker-compose.yml          # web + db services, deployed on the home server
 .env.example                # Template for required env vars (real .env is gitignored)
+dev_notes.md                 # Scratch file the user writes batches of feature requests
+                             # into (see "How to resume" at the bottom of this file)
 endpoints/                  # One blueprint per concern (see below)
-  tags.py                     # Tag submission wizard, tag detail, likes-now-removed,
-                               # comments, report, log-a-visit, search-a-tag (stub)
-  tutorial.py                  # NEW: 4-step onboarding shell for anonymous users
+  tags.py                     # Tag submission wizard, tag detail, comments, report,
+                               # delete (soft), log-a-visit, search-a-tag (stub),
+                               # rate limiting + duplicate-location cooldown
+  tutorial.py                  # 4-step onboarding shell for anonymous users
   profile.py                   # Profile page + edit + visited-tags API
-  feed.py                       # Instagram-style tag-only feed (reworked, see below)
+  feed.py                       # Instagram-style tag-only feed
+  dev_capture.py                # Raw geotagged photo capture dev tool, see below —
+                               # deliberately left open/unauthenticated, don't "fix" that
   bands.py, chat.py, leaderboard.py, admin.py, auth.py, index.py, map_api.py, assets.py
 library/
   config.py                 # Reads .env into a Config object
-  extensions.py              # db, login_manager, oauth singletons
+  extensions.py              # db, login_manager, oauth, csrf singletons
   models/                    # One SQLAlchemy model per file — see "Data model"
   services/                  # Business logic classes — see "Key services"
   i18n/
@@ -85,14 +118,21 @@ library/
     countries.py                 # ISO country list + flag-icon generator
 templates/                  # Jinja2, extends base.html (the app shell)
 static/css/style.css        # One shared stylesheet, CSS variables for theme
-static/js/app.js            # One shared JS file: map init, chat polling, infinite scroll
+static/js/app.js            # One shared JS file: map init, chat polling, infinite scroll,
+                             # CSRF fetch-monkeypatch, cookie banner
+static/models/               # (removed) — the ONNX detector model now lives under
+                             # assets/models/, served via a real Flask route, not
+                             # Flask's static file handler — see "AI / tag detection"
 assets/images/               # Uploaded images, hash-named, gitignored
+assets/models/                # tag_detector.onnx (~12MB YOLOv8n, ONNX export), admin can
+                             # replace it live via /admin/model — see below
 ```
 
-A **separate sibling project**, `C:\DaBalint\Projects\Python\graffiti_wars_ai\`
-(correct spelling), holds the AI tag-verification prototype (DINOv2 + shape
-matching, its own `.venv`, `main.ipynb`). It is NOT yet integrated into this
-Flask app — see "AI verification" below.
+A **separate sibling project**, `C:\Users\balin\Documents\Projects\Python\gradditi_ai\`
+(note: this path/name, not the old `graffiti_wars_ai` this file used to
+reference — that path doesn't exist), holds the real, **integrated** YOLOv8
+tag-detector training pipeline. See "AI / tag detection" below — unlike the
+old DINOv2 idea, this one **is** live in production.
 
 ## Data model (SQLAlchemy models, one per file in `library/models/`)
 
@@ -100,776 +140,842 @@ Flask app — see "AI verification" below.
   `avatar_url` OR a DiceBear fallback via `display_avatar_url`), banner_image,
   bio, nationality_code, `allow_direct_messages`, `band_id`/`band_role`/
   `band_joined_at` (a user belongs to at most one band at a time — no
-  membership table). **Life-path note**: when a user leaves/changes bands,
-  their OLD `TagPoint` rows keep their original `band_id` untouched — the
-  schema already supports a user having tags scattered across several bands
-  they were in over time. The profile page surfaces this (see "Profile page
-  features" below).
+  membership table), `last_location_lat/lon/at` (teleport anti-cheat cache,
+  see "Anti-cheat" below).
 - **Band** — reference_image, banner_image, `join_policy` (`open` /
-  `request` / `invite`), `nationality_code`, `color` (now a **freely chosen
-  hex color** via a native `<input type="color">`, no longer a fixed
-  palette — see `bands.py`'s `HEX_COLOR_PATTERN` validation)
+  `request` / `invite`), `nationality_code`, `color` (freely chosen hex via
+  `<input type="color">`), **new this session: `is_deleted` (bool) /
+  `deleted_at`** — disbanding a band is now a soft-delete, see "Deletion
+  policy: everything is logical, not physical" below. A deleted band is
+  filtered out of every listing and 404s on direct access, but the row and
+  everything tied to it stays in the database.
 - **Image** — the single table every uploaded image goes through: category,
-  sha256 content hash as filename (dedup for free), served via
+  sha256 content hash **of the re-encoded JPEG bytes** (not the raw upload —
+  see "Image handling" below, this changed this session), served via
   `/assets/images/<path>` (`endpoints/assets.py`, not Flask's `static/`)
-- **TagPoint** — a submitted, geolocated tag. `status` is always `approved`
-  right now (auto-approve, no admin queue). Has `area_added_km2` (cached,
-  computed once per `TerritoryEngine.recompute_all()` pass — do NOT
-  recompute this live per page view, see "Territory algorithm"). Has
-  `description` (new, optional free-text field, entered at upload time,
-  threaded through the 3-step submission wizard via querystring/hidden
-  fields, shown on the tag detail page under the photo).
-- **TagComment** — text-only comments on a tag's detail page (new).
-- **TagVisit** — new: logs that a user visited/photographed *someone else's*
-  tag ("visited tags" feature). Currently **auto-accepted** — no real
-  photo/location matching against the tag yet (explicitly deferred by the
-  user, same "accept everything for now" pattern as tag submission itself).
-  `tag_point_id`, `visitor_id`, `photo_image_id`.
-- **TagLike — REMOVED.** The like feature was built in one round and then
-  explicitly removed in a later round ("vedd ki a like funkciót, erre már
-  nincs szükség"). The model file is deleted; don't re-add it unasked.
+- **TagPoint** — a submitted, geolocated tag. `status` is `approved` /
+  `removed` (soft-deleted, via report-resolution, admin delete, the
+  submitter's own delete button, or a band being disbanded — all four paths
+  now converge on the same `status="removed"` + `removed_reason` pattern,
+  see "Deletion policy" below) — never `pending`, still no admin approval
+  queue for new submissions. Has `area_added_km2` (cached, computed once per
+  `TerritoryEngine.recompute_all()` pass — do NOT recompute this live per
+  page view). Has `description` (optional free-text, now **editable at any
+  time by the submitter**, not just settable once — see "Tag detail page"
+  below).
+- **TagComment** — text-only comments on a tag's detail page. Now rate-limited
+  (see "Rate limiting" below).
+- **TagVisit** — logs that a user visited/photographed *someone else's* tag.
+  Currently **auto-accepted** beyond a proximity + teleport check — no real
+  photo-matching yet. `tag_point_id`, `visitor_id`, `photo_image_id`. A user
+  can no longer log a visit to their **own** tag (blocked both server-side
+  and in the UI, this session). The whole "log a visit" feature was
+  user-facing-renamed away from "logolás"/"log" wording to
+  "meglátogatás"/"visit" this session — the Python route/function names
+  (`log_visit`, `/tags/<id>/log`) were deliberately left as-is, only the
+  translated strings changed.
+- **TagLike — still REMOVED**, unchanged from before.
 - **BandTerritory** — one row per band, the *computed* result (GeoJSON +
   area_km2), fully replaced on every recompute.
 - **Landmark** — cached OSM points of interest inside a band's territory.
-- **BandJoinRequest**, **TagReport**, **NewsFeedEvent**, **AdminAction** — as named.
-  `NewsFeedEvent` is still created on band-created/member-joined/tag-approved
-  events, but **the public feed page no longer reads from it** (see "Feed
-  rework" below) — it may be fully dead weight now except for whatever else
-  might reference it; check before assuming it still matters anywhere.
+  Deliberately **not** deleted when a band is disbanded (see "Deletion
+  policy" — it's a rebuildable cache tied to a band that no longer shows up
+  anywhere, so leaving stale rows is harmless).
+- **BandJoinRequest** — the **one exception** to the logical-delete rule:
+  pending requests ARE actually hard-deleted when a band is disbanded (the
+  user explicitly said this is fine, they're disposable, not "content" —
+  see "Deletion policy").
+- **TagReport**, **NewsFeedEvent**, **AdminAction** — as named.
+  `TagReport.reason` is now truncated to 255 chars server-side
+  (`db.String(255)`, was previously unenforced and could crash on Postgres
+  with a raw long POST — see "Security hardening").
 - **Conversation** / **ConversationParticipant** / **ChatMessage** — generic
-  chat model. `ChatMessage.message_type` now includes `"tag_added"` (a
-  system-style message auto-posted into a band's own conversation whenever
-  a member submits a new tag — see "Chat system messages" below), in
-  addition to the original `text`/`image`/`location`/`poll`. Has a new
-  `tag_point_id` FK (nullable, used only by `tag_added` messages).
+  chat model. `ChatMessage.message_type` includes `"tag_added"` (a
+  system-style message auto-posted into a band's own conversation whenever a
+  member submits a new tag).
+- **SiteSetting** — `key: str (PK), value: float`. Admin-editable numeric
+  thresholds; see "Key services" (`SettingsService`) — **22 keys now**, up
+  from 11, see the full current list there.
 
 ## Key services (`library/services/`)
 
-- **TerritoryEngine** — the core game mechanic, now including a reclaim
-  mechanic. See "Territory algorithm" below — this changed significantly
-  since the last time this file was written.
-- **LeaderboardService** — global / national / local (haversine, 25km) rankings.
+- **TerritoryEngine** — the core game mechanic, a competitive
+  contested-ground algorithm (see "Territory algorithm" below). **Not
+  touched this session** despite the InkTrail concept discussion — see
+  "Planned future direction" below, this is flagged for a future rework,
+  not yet started.
+- **LeaderboardService** — global / national ("Nationality" scope, now
+  GPS-reverse-geocoded, see "Leaderboard" below) / local (haversine, 25km)
+  rankings.
 - **LandmarkService** — Overpass API queries, caches into `Landmark`.
-- **ImageStorage** — content-hash-based upload handler.
-- **ExifExtractor** — reads DateTimeOriginal/DateTime/GPS out of a photo.
-- **ChatService** — conversations, messages, `mark_read`. **`unread_count()`
-  was removed** along with the whole unread-badge feature (see "Removed
-  features" below) — don't re-add without being asked.
-- **color_utils.py** (new) — `contrast_shade(hex)` and `hex_to_rgba(hex, alpha)`,
-  pure color-math helpers registered as Jinja globals, used for the
-  per-band accent color feature (see "Accent color = band color" below).
+  Landmark refresh calls after tag/band removal are now backgrounded on a
+  thread (see "Known bugs fixed" — this used to block the admin's request
+  for up to the Overpass timeout).
+- **ImageStorage** — **rewritten this session**. No longer just a
+  content-hash file-mover: every upload is now decoded with PIL
+  (`Image.open` — this alone is real content validation, replacing the old
+  extension-only check, since a non-image file now fails to decode and is
+  rejected), `ImageOps.exif_transpose`'d, downscaled if it exceeds
+  `image_max_dimension_px`, and re-encoded as JPEG at `image_jpeg_quality` —
+  the sha256 hash used for the filename/dedup is of the **re-encoded**
+  bytes, not the original upload. Also enforces `max_upload_size_mb` before
+  doing any of that. All three of those are admin-editable `SiteSetting`s.
+  Stored extension is now always `"jpg"` regardless of what was uploaded.
 - **UsernameValidator**, **Translator**, **GeoProjector** — unchanged.
-- **TagVerifier** (the old perceptual-hash placeholder) — **deleted from
-  this codebase**. Real verification work has moved to the separate
-  `graffiti_wars_ai` sub-project (DINOv2-based) — see "AI verification".
+- **ChatService** — conversations, messages, `mark_read`, `remove_band_member`
+  (used both for kicking and for disbanding — see "Deletion policy": it only
+  clears `ConversationParticipant` rows, never touches `ChatMessage`s).
+- **color_utils.py** — `contrast_shade(hex)` / `hex_to_rgba(hex, alpha)`,
+  unchanged.
+- **SettingsService** — `DEFAULT_SETTINGS` now has **22 keys** (was 11):
+  the original 11 game-balance/validation thresholds, plus this session's
+  additions —
+  `max_upload_size_mb` (10), `image_max_dimension_px` (1920),
+  `image_jpeg_quality` (82), `duplicate_tag_radius_meters` (15),
+  `duplicate_tag_window_minutes` (60), `tag_submit_rate_limit_count` (10) /
+  `_window_minutes` (60), `tag_visit_rate_limit_count` (20) /
+  `_window_minutes` (60), `tag_comment_rate_limit_count` (20) /
+  `_window_minutes` (10). Two of the original 11 also had their default
+  values **changed this session** (not code-only — these are live defaults
+  that apply immediately to any DB with no admin override, and the
+  production `site_settings` table was confirmed empty, so these are the
+  actual live effective values): `max_travel_speed_kmh` 130→**140**,
+  `teleport_distance_tolerance_meters` 50→**15**, and `poll_max_options`
+  4→**10**. Every setting still needs a matching
+  `t("setting.<key>_label")`/`t("setting.<key>_description")` pair in
+  `translations.py` and an entry in `admin.py`'s `SETTINGS_DISPLAY_ORDER` —
+  verified programmatically this session that all three lists (defaults,
+  display order, i18n keys) are in exact 1:1 correspondence; keep that
+  invariant when adding more.
+- **TagVerifier** (the old perceptual-hash placeholder) — confirmed **dead
+  code, not called from anywhere** in the live app (verified by grep this
+  session). Left in place but inert; don't assume it does anything.
 
-## Territory algorithm (read carefully before touching — this changed since last write-up)
+## Deletion policy: everything is logical, not physical
 
-Implemented in `TerritoryEngine.recompute_all()` (`library/services/territory_engine.py`):
+**New, explicit, project-wide rule this session** ("minden törlés ami a
+rendszerben van, csak logikai törlés legyen... az adatbázisban maradjon és
+a hozzá tartozó fájlok is későbbi felhasználásra"): no user-facing "delete"
+action should ever actually erase a database row or a file on disk. It
+should just stop showing up anywhere in the game.
 
-1. **Spatial clustering per band** (union-find, `cluster_link_distance` =
-   4× tag radius = 400m default) — unchanged from before.
-2. **Per-cluster convex hull** of 100m-radius circles around each cluster's
-   tags — unchanged.
-3. **Chronological "painter's algorithm"**: replay all tags across all bands
-   in `created_at` order; a cluster's hull is subtracted from every *other*
-   cluster's stored geometry it overlaps — newest event wins in contested
-   areas. Unchanged in spirit.
-4. **NEW: explicit reclaim/neutralization mechanic.** Before a new tag is
-   added to its cluster, the engine checks: does this tag's own attraction
-   circle (its 100m buffer, NOT the whole cluster hull) touch the buffer
-   circle of an *enemy* tag that is currently encroaching on this cluster's
-   territory? If so, that enemy tag is **neutralized** — it's excluded from
-   its own cluster's hull computation from that point on (it stays on the
-   map as a normal marker, submitted_by/band/photo all intact, it just stops
-   contributing to territory), and the defending cluster's ground is
-   restored immediately. This uses a uniform spatial grid (cell size = 2×
-   radius) to avoid an O(n²) scan. See the class docstring in
-   `territory_engine.py` for the full explanation — it's genuinely subtle,
-   don't reimplement from memory, read the code.
-   - This was specifically requested to make reclaiming *require* actual
-     proximity to the specific capturing tag, rather than the old implicit
-     behavior where literally any new same-band tag anywhere in the cluster
-     would silently wipe out an enemy's capture.
-   - Verified with isolated unit-style test scripts (capture→reclaim works;
-     an unrelated nearby-but-non-overlapping enemy tag is NOT wrongly
-     neutralized) and against the full ~3200-point seed dataset (recompute
-     went from ~11.5s to ~14.6s — acceptable since this only runs after a
-     tag submission, not on page views).
-5. `area_added_km2` (each point's own cluster hull growth at the moment it
-   was added) is cached on `TagPoint` during this same pass — **read it
-   directly on the tag detail page, never recompute live** (a previous,
-   separate performance bug had a `marginal_area_km2()` method redoing a
-   full replay per page view, ~11.5s per load; it was deleted entirely in
-   favor of this cached-at-write-time approach).
+- **Tags** already worked this way before this session (`status="removed"`,
+  filtered out of `/api/tags.geojson` and everywhere else that lists
+  approved tags). This session added a **submitter-facing delete button**
+  on the tag detail page (`/tags/<id>/delete`, `tags.delete_tag`) that uses
+  the exact same mechanism, plus a **styled confirmation modal** (not a
+  native `confirm()` — matches the report-tag modal pattern) before it
+  fires.
+- **Bands** were the one place that still did real hard deletes — both the
+  self-service disband flow (`bands.py`'s `_delete_band()`, used by
+  `disband_band()` and by `_delete_band_if_empty()` when the last member is
+  kicked/leaves) and the admin delete route (`admin.py`'s `delete_band()`)
+  used to physically `DELETE` the band row plus every `TagPoint`,
+  `BandJoinRequest`, `Landmark`, `NewsFeedEvent`, `ChatMessage`,
+  `ConversationParticipant`, and the `Conversation` itself. **Rewritten this
+  session** to instead:
+  - Clear members' `band_id`/`band_role`/`band_joined_at` (unchanged — this
+    is a membership relationship, not "content", fine to reset).
+  - Mark the band's own `approved` `TagPoint`s as `status="removed"` (same
+    mechanism as any other tag removal — they naturally drop off the map).
+  - Remove `ConversationParticipant` rows for the band's conversation (this
+    is "who currently sees this in their inbox", not content — removing it
+    is necessary so a dissolved band's chat doesn't linger in ex-members'
+    inboxes) but **leave the `Conversation` and every `ChatMessage` in it
+    completely untouched**.
+  - Set `band.is_deleted = True` / `band.deleted_at = utcnow()` instead of
+    `db.session.delete(band)`.
+  - **Exception, explicitly requested by the user after initially asking
+    for everything to be logical**: pending `BandJoinRequest` rows ARE
+    still hard-deleted (`"tényleg törölhető"` — they're disposable
+    administrative artifacts, not content worth preserving).
+  - `Landmark` rows for the band are **not** touched either way (neither
+    deleted nor needed — it's a rebuildable OSM cache, and since the band
+    is filtered out of every listing, nothing will ever query it again;
+    deliberately left alone rather than "cleaned up", per the letter of the
+    "don't delete anything" rule).
+- **Every band-listing surface now filters `is_deleted == False`**: the
+  public band list/search (`bands.py`'s `_query_bands()`), the admin band
+  list (`admin.py`'s `bands_api()`). `band_detail()` 404s on a deleted band
+  instead of rendering it. `join_band()`/`request_join()` also 404 on a
+  deleted band — this closed a real gap where someone could technically
+  `POST` a join request to a disbanded band's still-existing row and
+  "resurrect" it into a functioning band again.
+  - Territory/leaderboard/map surfaces needed **no extra filtering** — since
+    a disbanded band's tags are all `status="removed"`, `TerritoryEngine`
+    naturally produces no `BandTerritory` row for it, which naturally
+    excludes it from the map and every leaderboard scope. Worth remembering
+    if this class of bug comes up again: the tag-status filter is the
+    single source of truth that most other "is this band's stuff visible"
+    logic already derives from.
+  - Band **name uniqueness** was deliberately left checking against ALL
+    bands including deleted ones (`Band.query.filter_by(name=name)`, not
+    filtered by `is_deleted`) — `Band.name` has a real DB-level
+    `unique=True` constraint, so a disbanded band's name staying
+    permanently reserved is the safe choice; freeing it up for reuse would
+    need dropping/reworking that constraint, judged not worth the risk for
+    an edge case nobody asked about.
+- **Schema**: `is_deleted`/`deleted_at` added via the same idempotent
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` pattern as every other
+  post-launch schema change (no migration tool in this project — see the
+  teleport-detection note below for why). **Verified live against the
+  actual local dev Postgres** this session (not just read — `main.py` was
+  actually imported, which runs `create_app()` at module level, which ran
+  the migration for real): confirmed the `bands` table gained both columns,
+  51 pre-existing bands all correctly defaulted to `is_deleted=False`, no
+  data loss. **As of this writing this is committed but not yet confirmed
+  deployed to the production server** — check `git log`/the live
+  container's build date before assuming the prod DB has these columns; the
+  same idempotent migration will apply itself automatically on next deploy,
+  no manual DB step needed either way.
 
-## Map tiles decision (updated — read this before touching tile config again)
+## AI / tag detection (this session's version — supersedes the old DINOv2 note)
 
-Current state: **standard OpenStreetMap raster tiles**, but now with a CSS
-`filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9)
-saturate(0.7)` applied via a `map-tiles-dark` class (`app.js` passes
-`className: "map-tiles-dark"` to `L.tileLayer`, CSS rule targets
-`.map-tiles-dark img.leaflet-tile`). This gives a dark theme **while still
-showing all POI icons/labels** (the earlier constraint that killed the
-CartoDB `dark_all` attempt — see the old note below, still true) because
-it's literally the same standard tiles, just visually filtered.
+**Correction to an earlier revision of this file**: it used to describe a
+DINOv2-embedding-based photo-vs-reference similarity matcher being
+prototyped in `C:\DaBalint\Projects\Python\graffiti_wars_ai\`. **That path
+doesn't exist anymore and that work was never integrated.** What actually
+exists and IS integrated, from a **different** sibling project,
+`C:\Users\balin\Documents\Projects\Python\gradditi_ai\`:
 
-**Also tried and rejected in this session**: CartoDB's `dark_all` tile
-provider a second time — it turned out to now require an API key (confirmed
-via a screenshot showing "API KEY REQUIRED" watermarks tiled across the
-map), so it was abandoned in favor of the CSS filter approach, which has no
-third-party dependency at all.
+- A **YOLOv8n object detector** (single class, `"Tags"`) trained via
+  Ultralytics on a small (113-image) locally-annotated dataset
+  (`assets/dataset/raw/{images,labels}` in `gradditi_ai`), with a full
+  notebook pipeline (`detection.ipynb`): split → auto-orient/resize
+  preprocessing → offline augmentation (rotation, saturation/brightness/
+  exposure jitter, noise; admin-tunable `AUGMENTATIONS_PER_IMAGE`) → train →
+  validate with diagnostic plots → export to ONNX (opset 12, simplified).
+  This solves a **different problem** than the old DINOv2 idea: it doesn't
+  check *which* tag/band a photo matches, it just detects *whether a
+  graffiti tag is visible in frame at all* — used purely to gate the
+  camera shutter, not for authenticity verification.
+- **This IS live in the main Flask app**, unlike the old idea. The exported
+  `tag_detector.onnx` (~12MB) lives at `graffiti_wars/assets/models/`,
+  served via a real Flask route (`endpoints/assets.py`'s
+  `/assets/models/<path>`, not the `static/` folder — this was moved back
+  and forth once this session before landing here permanently) and loaded
+  client-side via **onnxruntime-web** (CDN, WASM execution provider) on
+  `templates/tag_submit_upload.html` and the standalone dev tool
+  `templates/dev_capture.html` (both run the identical detection logic —
+  keep them in sync if you change one).
+- **Admin can replace the model live** without a redeploy: `/admin/model`
+  (`endpoints/admin.py`), a new 5th admin nav tab. Shows current model
+  size/last-modified, accepts a new `.onnx` upload (extension-checked, no
+  deeper validation — this is an admin-only, trusted-input surface) and
+  overwrites `tag_detector.onnx` at a fixed filename, so every reference to
+  it elsewhere never needs to change.
+- **Detection UI, iteratively refined this session into its current final
+  form** (both `tag_submit_upload.html` and `dev_capture.html`):
+  - A **fixed-position, rounded-corner square** in the center of the frame
+    (`TARGET_SQUARE_FRACTION = 0.62` of the shorter viewport dimension) —
+    it never moves to track the detection; the user moves the phone. Darkens
+    everything outside it via a `destination-out` canvas composite "hole
+    punch", not a CSS box-shadow (an earlier attempt with box-shadow on the
+    wrapper got silently painted over by the opaque `<video>`/`<canvas>`
+    siblings — draw directly on the topmost canvas instead if this bug
+    resurfaces elsewhere).
+  - Square border color: gray while the model is still loading, red once
+    detection has started but nothing qualifying is found, green when a
+    tag qualifies (see below).
+  - **Sizing logic, went through two failed iterations before landing on
+    the current one** — worth reading carefully if this needs touching
+    again:
+    1. First version used the *area* of the detected bounding box vs. the
+       whole video frame's area as the "big enough" signal
+       (`MIN_TAG_AREA_FRACTION`, tuned 3%→5%→6%→5% across several rounds).
+       **This had a real dead-zone bug**: a thin, elongated tag (vertical
+       or horizontal lettering) can have a tiny area while its long edge
+       already fills the target square — the area-based check would keep
+       demanding the user move closer, but moving closer only grows the
+       long edge further, pushing it past the square's edge (triggering
+       the "move farther" overflow case) before the area ever cleared the
+       threshold. There was no valid distance for that shape.
+    2. Fixed by switching to **`MIN_FILL_FRACTION`** (currently **0.7**,
+       tuned up from an initial 0.4 across a couple of rounds): compares
+       the detected box's **longer edge** to the target square's edge,
+       regardless of aspect ratio. This has no dead zone — verified
+       conceptually against the exact reported failure case (a
+       10px-wide × 280px-tall box at a 300px square: old area-based logic
+       could never reach 5% area without the height first overflowing;
+       new logic immediately recognizes `280/300 = 93%` as "already big
+       enough").
+  - **Guidance banner** (top of frame, styled — not a native `alert()`),
+    exactly four states, checked in this priority order every detection
+    tick: no detection → "Mutasd a tag-et"/"Show the tag"; box wider or
+    taller than the square (can *never* fit no matter how it's
+    repositioned — a genuine distance problem) → "Menj távolabb"/"Move
+    farther away"; box would fit but isn't currently fully inside the
+    square (`isFullyInsideSquare()` — checks all four edges, not just the
+    center point, after an earlier version that only checked the center
+    let an obviously-overflowing box still count as "found") →
+    "Helyezd a kijelölt területen belülre"/"Place it inside the marked
+    area"; fully inside but `fillFraction < MIN_FILL_FRACTION` → "Menj
+    közelebb"/"Move closer". Success (fully inside AND big enough) hides
+    the banner and shows the confidence meter instead.
+  - **Confidence meter**: a fixed top-center bar, pointer position scaled
+    so the bar's low end represents `CONF_THRESHOLD` (0.5) not 0 (a
+    detection below threshold never shows the bar at all, so this avoids
+    squeezing the pointer into a tiny slice of the bar).
+  - **`DEBUG_SHOW_DETECTION_BOX = true`** draws the raw, unfiltered
+    detection box as a light-gray dashed rounded-rect, independent of the
+    fixed square — added for tuning/testing, **still `true`** as of this
+    writing, flip to `false` (or remove the block) once detection tuning is
+    considered done; it's clearly commented as removable.
+  - **Loading state**: the gray-outlined square (no detection running yet)
+    appears immediately once the camera stream is ready, *before* the ONNX
+    model finishes loading — a real bug was hit and fixed here: the first
+    attempt called `drawOverlay()` before the `const` block defining the
+    colors/radius it needed had executed (a JS temporal-dead-zone bug — the
+    call site was textually earlier in the file than the `const`
+    declarations it closed over), which silently killed the entire async
+    setup function with no visible error. Fixed by moving all the
+    constants those early calls depend on to the very top of the script,
+    before any function that might run early. If camera-page changes
+    stop working with no console error and no clear reason, suspect this
+    same TDZ class of bug first.
+  - Detection runs every `DETECTION_INTERVAL_MS = 350`ms via `setInterval`,
+    letterboxes each frame to 640×640 (matching training `imgsz`) before
+    inference, decodes the single highest-confidence anchor (single class,
+    so no NMS needed).
 
-**Original historical note, still relevant**: an earlier iteration switched
-to CartoDB's `dark_all` style and the user reported it was "too dark, can
-barely see anything" — `dark_all` deliberately omits POI icons/labels. If
-asked to make the map theme dark again in the future, the CSS-filter-on-
-standard-tiles approach is the one that satisfies both constraints
-(dark AND POI-visible) — don't reach for a different tile provider first.
+## Territory algorithm — UNCHANGED this session, but see "Planned future direction" below
 
-## Landmark feature (Overpass API integration)
+Implemented in `TerritoryEngine.recompute_all()` (`library/services/territory_engine.py`).
+Still the same competitive "painter's algorithm" with reclaim/neutralization
+described in the previous revision of this file — spatial clustering per
+band, per-cluster convex hulls, chronological replay where newer tags carve
+into other bands' overlapping territory, an explicit proximity-gated reclaim
+mechanic. **Nothing here was touched this session.** Read the class
+docstring in `territory_engine.py` for the full mechanical explanation if
+you need it — it's genuinely subtle, don't reimplement from memory.
 
-Unchanged from before: 6 top-level OSM categories (`amenity`, `shop`,
-`tourism`, `leisure`, `historic`, `office`), `LandmarkService.refresh_for_band()`,
-`OVERPASS_HEADERS` needs a descriptive User-Agent or you get 406, the public
-instance is slow/flaky (2–25+s, occasional timeouts) and this is handled
-gracefully already.
+**Important**: the user has since decided (end of this session, not yet
+implemented) that they want to move away from this entire competitive
+model — see "Planned future direction: InkTrail rework" below before
+extending or "fixing" anything in this file's competitive logic; it may be
+largely deleted in a future session rather than built on further.
 
-## Tag submission flow (rewritten this session — live camera + geolocation, no EXIF)
+## Planned future direction: InkTrail rework (discussed, NOT implemented)
 
-**This replaced the older EXIF/file-picker-based flow described in earlier
-revisions of this file.** If you find any old note about a `/tags/submit/locate`
-step, an EXIF freshness check, or a `description` field on the first page,
-that's stale — the flow below is current.
+At the very end of this session, after a product/market discussion (the
+user asked for market research on who this app could realistically serve),
+the user decided on a specific future direction and asked it to be recorded
+for a later session — **explicitly not implemented yet, brainstorming
+only**:
 
-`/tags/submit` (GET) now renders `tag_submit_upload.html`, a **full-screen
-live camera capture page**, not an upload form:
+- **Rename the app to "InkTrail"** (picked over other brainstormed options —
+  SprayMap, TagMap, Writers' Atlas, Bomb Log — for its personal-journey
+  connotation over SprayMap's more literal "map app" read).
+- **Drop the competitive territory-conquest mechanic entirely.** No band
+  should be able to take territory away from another band. Instead:
+  everyone just uploads their own tags, and a band's "territory" becomes
+  simply the accumulated coverage of its own tags — overlapping another
+  band's coverage is fine, nothing is contested or carved out. Bands still
+  exist, but purely as a grouping of members' tags, not as factions
+  fighting over area.
+- **Why**: two things came out of the market-research discussion. (1) Real
+  GPS+photo graffiti-tracking tools that exist in the market (Graffiti
+  Tracker, TAGRS) are literally law-enforcement/prosecution tools — the
+  same data shape this app collects. This reinforced a preference for a
+  closed/non-adversarial framing over a competitive one, both for lower
+  legal/social risk and because it fits real graffiti-crew culture better
+  ("going over" someone else's spot is real-world disrespect between real
+  people who may know each other, not just a harmless game mechanic like in
+  Ingress/Pokémon GO where "territory" is purely virtual). (2) The current
+  `TerritoryEngine`'s reclaim/neutralize/carve logic exists **specifically**
+  to resolve cross-band conflicts — removing the competitive framing makes
+  that entire mechanism unnecessary, which is a genuine code-simplification
+  opportunity on top of being a product decision (each band's territory
+  would become "union of its own tag clusters", no cross-band interaction
+  at all, no painter's-algorithm replay, no reclaim grid).
+- This is also saved in the user's Claude auto-memory (not just this file) —
+  see `project_graffiti_wars_inktrail_rework.md` in the memory directory if
+  you have access to it, same content.
+- **If asked to start this**: confirm scope with the user first (this
+  touches `TerritoryEngine`, the leaderboard's framing, probably the repo
+  name eventually, `README.md`, every "Wars"/competitive-flavored UI string
+  in `translations.py`, and the domain/branding is a separate, bigger
+  decision the user hasn't committed to yet — the rename was explicitly
+  scoped to "the app", not necessarily the live domain).
 
-1. On load, it calls `navigator.mediaDevices.getUserMedia({video: {facingMode:
-   "environment"}})` and shows the live feed full-bleed with one circular
-   shutter button — no file `<input>` exists anywhere in this flow, so there
-   is no way to pick an old photo from disk/gallery (this was a deliberate
-   fix: canvas-exported images never carry EXIF, and file pickers let users
-   browse old photos, defeating any "must be fresh" intent).
-2. Tapping the shutter draws the current video frame to a hidden `<canvas>`,
-   exports it as a JPEG blob, stamps a `client_now` timestamp (the actual
-   moment of the tap), then **immediately** calls
-   `navigator.geolocation.getCurrentPosition()` — no manual location picker,
-   the location is not user-editable.
-3. Once geolocation resolves, a `fetch()` POST sends `photo` + `client_now`
-   + `lat` + `lon` (all in one shot, no separate confirm step) to
-   `POST /tags/submit`. On success (redirect) it navigates to
-   `/tags/submit/processing`; on a validation error the JSON... actually HTML
-   error response is swapped in via `document.open()/write()/close()` so the
-   flash message still shows without a full page reload.
-4. If camera or geolocation permission is denied/unavailable, an inline
-   error is shown (camera failure replaces the whole view with a "back to
-   map" link; geolocation failure shows a dismissable banner over the live
-   feed and re-arms the shutter button so the user can retry).
-5. `/tags/submit/processing` → `POST /tags/submit/finalize` unchanged from
-   before (2.2s spinner, then finalize creates the `TagPoint`).
+## Security hardening (major session, both static review and live pentest)
 
-**Removed entirely as part of this rewrite** (don't re-add unasked):
-- `ExifExtractor` / `library/services/exif_extractor.py` — deleted. It had a
-  real bug (read `DateTimeOriginal`/`DateTimeDigitized` from the wrong IFD,
-  always returning `None`), but even after fixing that, real-world photos
-  captured via a browser `<input capture>` on iOS Safari turned out to carry
-  **no EXIF date or GPS at all** (Apple strips it from web-facing camera
-  captures for privacy) — confirmed against real uploaded photos this
-  session. That's what motivated the switch to live `getUserMedia` capture
-  instead of relying on EXIF/file-picker metadata at all.
-- `MAX_PHOTO_AGE_SECONDS` / the 60-second EXIF-freshness check in
-  `submit_tag()` — meaningless now since canvas exports have no EXIF and the
-  live-camera-only UI already structurally prevents uploading an old photo.
-- `/tags/submit/locate` route + `tag_submit_locate.html` (manual map-based
-  location picker) and `/tags/submit/cancel` — both dead once location comes
-  from `getUserMedia`-adjacent `getCurrentPosition()` unconditionally.
-- The optional **description** field on the first page (from an earlier
-  round) — also dropped when the page became camera-only. `TagPoint.description`
-  the column still exists and `finalize()` still accepts an (now always-empty)
-  `description` form field, so it's trivial to wire a description entry point
-  back in at some later step if asked — just not on the camera page itself.
-- Translation keys removed with the above: `flash.photo_no_capture_time`,
-  `flash.photo_too_old`, `flash.submission_cancelled`, `tag.upload_help`,
-  `tag.locate_title`, `tag.locate_help`, `tag.cancel_button`.
+The site went from zero CSRF protection and an unaudited security posture to
+a hardened one this session, in three phases: (1) implement CSRF + session
+persistence + a cookie-consent banner (user-requested), (2) a full static
+code security review (self-requested audit, then a background sub-agent did
+a second independent pass), (3) **live penetration testing against the
+actual production deployment** (`graffiti.balintdaniel.com`), explicitly
+authorized by the user ("próbáld feltörni").
 
-**Next planned step (not yet started, explicitly deferred by the user)**: AI
-verification is meant to plug in after this camera+geolocation flow — i.e.
-once the photo+location lands in `finalize()`, that's the intended
-integration point for the real verification model from the separate
-`graffiti_wars_ai` sub-project (see "AI verification" below). Not implemented yet.
+### CSRF + persistent login + cookie banner
 
-**Still true**: `ImageStorage.save()` only flushes, doesn't commit — each
-wizard step boundary needs its own `db.session.commit()`.
+- **`Flask-WTF`'s `CSRFProtect`** (`csrf` singleton in `extensions.py`,
+  `csrf.init_app(app)` in `main.py`) is global — every state-changing
+  request needs a token or gets a 400 (verified live: a bare `POST` with no
+  token to any of ~24 mutating routes across bands/chat/tags/admin all
+  correctly 400 with "The CSRF token is missing").
+- **Every native `<form method="POST">` in every template** (both
+  server-rendered and JS-`innerHTML`-built ones, e.g. admin's kick/ban/
+  delete forms) got a `csrf_token` hidden input — this was a full,
+  systematic file-by-file pass across ~21 templates.
+- **`app.js`'s `window.fetch` is monkey-patched** at the top of the file to
+  auto-attach an `X-CSRFToken` header (read from a `<meta name="csrf-token">`
+  tag `base.html` now always renders) to any same-origin state-changing
+  `fetch()` call, so individual call sites never needed manual edits. A
+  `getCsrfToken()` helper exists for the JS-template-literal-built forms
+  that need the token as a literal hidden-input string instead.
+- **Flask-WTF also enforces a `Referer` header check on HTTPS requests by
+  default** — discovered live while testing (a `curl` POST with a valid
+  token but no `Referer` header still got a 400); worth remembering if a
+  future non-browser client (a script, a different app) needs to POST to
+  this app over HTTPS, it must send a same-origin `Referer` too, not just
+  the token.
+- **`/dev/capture` is the one template that doesn't extend `base.html`**
+  (it's a standalone page) and was initially missed by the blanket CSRF
+  pass — its upload form 400'd in production until a manual
+  `csrf_token`/`X-CSRFToken` fix was added directly in that template. If
+  another fully-standalone template ever gets added, remember it won't
+  inherit the `<meta>` tag or the `app.js` include automatically.
+- **Login is now permanent**: `google_callback()` sets `session.permanent =
+  True` and `login_user(user, remember=True)`; `PERMANENT_SESSION_LIFETIME`
+  and `REMEMBER_COOKIE_DURATION` are both `timedelta(days=365)` in
+  `main.py`. A logged-in user stays logged in until they explicitly log
+  out — this was a deliberate product decision, not a bug, but it does mean
+  a stolen session/remember cookie is valid for a full year (flagged as a
+  known, accepted tradeoff, see the pentest findings below).
+- **Cookie banner** (`#cookieBanner` in `base.html`): purely informational,
+  since login/session cookies are essential and not optional — no
+  accept/reject choice, just a dismiss button. Dismissal state is
+  `localStorage`, deliberately not a real cookie (avoids a round trip).
+- Along the way, two related UX bugs were found/fixed: the "loading
+  detector" and "show the tag" banners could briefly show at once on the
+  camera page (fixed by having the guidance banner itself carry the
+  loading-state text server-side, swapped out the instant detection
+  starts); and page-level pinch-zoom was fighting with the Leaflet map's
+  own zoom (fixed via `maximum-scale=1.0, user-scalable=no` on the viewport
+  meta tag in `base.html` — the map's own zoom is unaffected, that's a
+  Leaflet-internal redraw, not a browser-native gesture).
 
-**Also fixed this round**: `finalize()`'s `landmark_service.refresh_for_band()`
-call was synchronous and blocking — the public Overpass API measured **46.5s**
-to time out against the seeded dataset (confirmed with a standalone timing
-script), which is why the processing spinner appeared to hang forever instead
-of finishing after its 3s minimum. Fixed by running the landmark refresh on a
-background `threading.Thread` (`_refresh_landmarks_async` in `tags.py`) so
-`finalize()` returns as soon as the `TagPoint` + territory recompute are done
-(`TerritoryEngine.recompute_all()` itself is fast, ~0.3s on this dataset — it
-was never the bottleneck). `finalize()` now also redirects to the new tag's
-own detail page (`tags.tag_detail`) instead of the map.
+### Static + live security review — findings and current status
 
-**Shared camera CSS**: `.camera-wrap`/`.camera-video`/`.camera-shutter-btn`/
-`.camera-message`/`.camera-status-banner` live in `static/css/style.css` now
-(moved out of `tag_submit_upload.html`'s own `<style>` block), since a second
-page reuses the exact same live-camera UI — see "Tag visit logging" below.
+A **background sub-agent did an independent deep code read** (separately
+from the main session's own review) covering XSS, SQLi, IDOR, auth,
+file-upload validation, SSRF, mass assignment, business-logic bypass,
+secrets, and info disclosure. **Clean**: no SQL injection anywhere (100%
+SQLAlchemy ORM, the only raw `text()` calls are static `ALTER TABLE`
+strings with no user input), no stored/reflected XSS (Jinja autoescaping
+intact everywhere, `app.js`'s `escapeHtml()` used consistently for
+JS-built DOM content), no IDOR (every ownership/leadership check verified
+present and correctly scoped — band actions check both `band_id` match AND
+role, chat checks `is_participant()` on every route, tag edits check
+`submitted_by_id`), no open redirects, no SSRF, no mass assignment, no
+`Flask-CORS` misconfiguration.
 
-## Tag visit logging — also rebuilt around geolocation + live camera
+**Findings that WERE fixed this session** (the user picked these five out
+of the full list to act on immediately):
+- **Race condition in the teleport anti-cheat check**: with gunicorn's 3
+  worker processes, two concurrent requests from the same user could each
+  read the same stale `last_location_*` before either committed, both pass
+  the speed check, both get accepted — a scriptable bypass. Fixed with
+  `db.session.refresh(current_user._get_current_object(), with_for_update=True)`
+  right before the check, in both `finalize()` and `log_visit()` — a real
+  Postgres row lock, serializes concurrent requests for the same user
+  across worker processes (in-process locking wouldn't help here, the
+  workers are separate OS processes). Note the `._get_current_object()` —
+  `current_user` is a werkzeug `LocalProxy`, and `Session.refresh()` needs
+  the real object, not the proxy, to behave correctly.
+- **Missing baseline security headers**: `main.py` now has an
+  `@app.after_request` hook setting `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  and `Strict-Transport-Security`. **Deliberately no CSP** — building one
+  correctly for a page with an inline `<script>` block, Jinja-injected data,
+  and an onnxruntime-web CDN script needs real per-page allowlisting, judged
+  too risky to add hastily (could silently break the camera detection
+  script).
+- **`TagReport.reason` not length-capped before insert** — now `.strip()[:255]`
+  to match the column's `db.String(255)`.
+- **`app.js`'s `escapeHtml()` didn't escape `"`/`'`** — it round-trips
+  through a DOM text node, which handles `&`/`<`/`>` for free but not
+  quotes, and a few call sites use it inside an HTML attribute value. Now
+  also does `.replace(/"/g, "&quot;").replace(/'/g, "&#39;")` after the DOM
+  round-trip. Not currently exploitable anywhere (every attribute-context
+  call site happens to feed it server-validated data already) but was a
+  real footgun for future code.
+- **No lat/lon range validation** on any user-submitted coordinate — added
+  a shared `_is_valid_coordinate()` helper in `tags.py`, wired into every
+  place a client-supplied lat/lon is first accepted (`submit_tag`,
+  `processing`, `finalize`, `log_visit`).
 
-The "Log" button in each map marker's popup (`/tags/<id>/log`) used to be a
-plain file-upload form; it's now `tag_log_upload.html`, which — unlike the
-tag-submission camera page — checks location **first, then** opens the camera:
+**Findings confirmed but explicitly left open** (the user chose not to fix
+these yet, don't "fix" them unasked without checking first — some may be
+addressed by the dev_notes.md batch described below, verify current state
+before assuming):
+- **`main.py`'s `if __name__ == "__main__": app.run(..., debug=True)`** —
+  not reachable in the actual gunicorn/Docker deployment (gunicorn never
+  executes this block), so no live RCE risk today, but it's a landmine for
+  anyone who ever runs `python main.py` directly against a real DB. Still
+  present as of this writing (confirmed by grep at the end of this
+  session) — the user was asked which findings to fix and did not select
+  this one.
+- **`SECRET_KEY` dev-fallback string in `library/config.py`** — mitigated
+  in practice by `docker-compose.yml` requiring the env var
+  (`${SECRET_KEY:?set SECRET_KEY}`, Compose refuses to start without it),
+  but the fallback string is still literally in the code.
+- **365-day session/remember-cookie lifetime** — by design, see above, not
+  a bug, just a larger blast radius if a cookie is ever stolen.
+- **No `SESSION_COOKIE_SECURE`/`SAMESITE` set explicitly in Flask config**
+  — became less urgent once HTTP→HTTPS redirect + HSTS were enabled at the
+  nginx layer (see below), but still worth doing at the Flask level for
+  defense in depth if revisited.
 
-1. On load, immediately calls `navigator.geolocation.getCurrentPosition()`.
-2. Computes the distance (Haversine, client-side JS) from the user's current
-   position to the tag's own `lat`/`lon`. If it's over **10 meters**
-   (`LOG_VISIT_MAX_DISTANCE_METERS` in `tags.py`), shows a message ("you're
-   too far, get within 10m and try again") with a link back to the tag detail
-   page — the camera never opens at all.
-3. If within range, opens the live camera (same `getUserMedia`/canvas/shutter
-   pattern as tag submission) and on capture uploads the photo **plus the
-   already-measured user lat/lon** (not the tag's own coordinates) to
-   `POST /tags/<id>/log`.
-4. `log_visit()` re-checks the same 10m distance server-side using the
-   submitted lat/lon vs. `tag_point.lat`/`lon` (`_distance_meters()` helper,
-   a plain Haversine function in `tags.py`) — this is a deliberate
-   defense-in-depth check since the client-side gate can be bypassed (e.g. a
-   direct POST). Rejects with `flash(t("tag.log_too_far"))` if too far.
-5. `TagVisit` itself still doesn't store the visit's lat/lon (no model change
-   here) — the coordinates are only used for the proximity check, not persisted.
+**Live-only findings (infrastructure, not app code)**:
+- At the start of this session's pentest, `http://graffiti.balintdaniel.com/`
+  served the **full site in plaintext**, no redirect to HTTPS, and the
+  session cookie had no `Secure` flag — a real session-hijack risk on
+  untrusted networks. **This was fixed mid-session, but not by this Claude
+  session** — nginx now correctly 301-redirects HTTP to HTTPS and sends
+  `Strict-Transport-Security`, confirmed live; this was presumably done by
+  the user directly on the nginx-proxy-manager config, not via any code
+  change here. If this ever regresses, the fix lives at the reverse-proxy
+  layer, not in this Flask app.
+- **Live-exploited, then fixed, then verified again**: `/dev/capture/upload`
+  accepted a plain-text file renamed `capture.jpg` with zero content
+  validation, live in production — proven with a real PoC upload (then
+  immediately deleted from the server via SSH, no trace left). This was the
+  direct trigger for rewriting `ImageStorage` to do real PIL-based decode
+  validation (see "Key services" above) — **but note `dev_capture.py`
+  bypasses `ImageStorage` entirely** (`photo.save()` directly, by design,
+  per an earlier-session decision the user reaffirmed this session: "hagyd
+  el a dev linket, az ideiglenes" — leave the dev tool alone, it's
+  temporary) — so this specific PoC is **still reproducible** on
+  `/dev/capture` today, deliberately, as a known/accepted risk, not an
+  oversight.
+- Extensively tested and found **not** exploitable: Host-header injection
+  against the OAuth `redirect_uri` (nginx/SNI rejects mismatched Host
+  before the request ever reaches Flask), cookie tampering (itsdangerous
+  signature correctly rejects it), clickjacking is still technically
+  possible (no CSP, `X-Frame-Options` fix landed but wasn't deployed yet at
+  test time), HTTP verb tampering, backup/config file exposure
+  (`.env`/`.git`/`docker-compose.yml` all 404), directory listing,
+  parameter pollution, and — per explicit user instruction — actual DoS/
+  flooding was never attempted.
 
-Real photo-matching against the tag is still not implemented (same
-"accept everything once proximity-checked" pattern as before) — only the
-location gate is new/real here.
+## Rate limiting, image limits, duplicate-tag cooldown (dev_notes.md batch)
 
-## Anti-cheat: teleport-speed detection (GPS spoofing mitigation)
+A batch of anti-abuse requests from `dev_notes.md`, all DB-backed (no Redis
+in this stack, and gunicorn's 3 separate worker processes means an
+in-memory rate limiter wouldn't work correctly — same reasoning as the
+teleport race-condition fix above):
 
-Prompted by the user asking how spoofable the GPS-based checks are (answer:
-very — browser DevTools can fake `navigator.geolocation` in a couple of
-clicks, and a direct POST bypasses the client JS entirely; this is a
-friction/plausibility layer, not a cryptographic guarantee). Implemented in
-`endpoints/tags.py`:
+- **`_exceeds_rate_limit(model, user_field, user_id, count_key, window_key)`**
+  in `tags.py` — a generic helper, counts rows of a given model/user within
+  a rolling time window (via `created_at >=`). Wired into tag submission
+  (`finalize()`), tag visits (`log_visit()`), and comments (`post_comment()`,
+  returns a JSON `429` there since it's a fetch-based endpoint, with a
+  styled `alert()` on the client rather than a silent no-op).
+- **`_has_recent_nearby_tag(user_id, lat, lon)`** in `tags.py` — stops one
+  user from re-tagging the same spot repeatedly to farm territory: checks
+  the user's own non-removed tags from the last `duplicate_tag_window_minutes`
+  for one within `duplicate_tag_radius_meters`, rejects with
+  `flash.duplicate_tag_nearby` if found. Wired into `finalize()` only (not
+  `log_visit`, which already has its own 10m proximity-to-the-*existing*-
+  tag check for a different reason).
+- All six thresholds (3 rate-limit count/window pairs + 2 duplicate-tag
+  settings + the 3 image-processing settings above) are admin-editable
+  `SiteSetting`s — see "Key services" for the full current list.
 
-- **`User.last_location_lat/lon/at`** (new nullable columns, `library/models/user.py`)
-  cache the location + timestamp of the user's last *accepted* tag submission
-  or tag-visit log. Not shown anywhere in the UI.
-- **`_is_teleport(user, lat, lon, now)`** computes the implied travel speed
-  between that cached location and the new one (Haversine distance / elapsed
-  time). Flags it if speed exceeds `MAX_TRAVEL_SPEED_KMH = 130` (generous
-  highway-driving threshold, chosen to avoid false positives for legit users
-  travelling by car/train between city tags). A `TELEPORT_DISTANCE_TOLERANCE_METERS
-  = 50` floor absorbs ordinary GPS jitter between two near-simultaneous actions
-  and avoids division-by-near-zero weirdness.
-- Wired into **both** `finalize()` (tag submission) and `log_visit()` POST
-  (tag visit logging) — on a flag, rejects with `flash(t("flash.teleport_detected"))`
-  and no record is created. `_remember_location()` updates the cached location
-  only on a successful (non-rejected) submission/log.
-- `finalize()`'s check happens before creating the `TagPoint`, right where the
-  "real AI verification" placeholder comment already lives — same integration
-  point, this is just the first real defensive check to land there.
-- **No migration tool exists in this project** (no Alembic/Flask-Migrate) —
-  `db.create_all()` only creates missing tables, it never alters an existing
-  one's columns. Since this needed 3 new columns on an already-deployed
-  `users` table (both local dev DB and the live production DB), `main.py`'s
-  `create_app()` now runs three idempotent `ALTER TABLE users ADD COLUMN IF
-  NOT EXISTS ...` statements right after `db.create_all()` — safe to run on
-  every startup, self-heals any DB that doesn't have the columns yet without
-  needing a manual reseed or hand-run SQL on the server. If more schema
-  changes like this come up, follow the same pattern rather than introducing
-  a migration framework unless asked.
-- **What this does and doesn't defend against**: catches the "lazy"/accidental
-  cheating case well (can't submit from two far-apart real locations faster
-  than physically possible) and needs zero extra client trust. Does NOT stop
-  a determined attacker who fakes both coordinates *and* the previous
-  reference point consistently across a spoofing session — there's no way to
-  achieve that from a plain web app without native OS-level attestation.
-  Discussed with the user as one layer among several (also floated but not
-  yet implemented: `geolocation.coords.accuracy` threshold, exact-duplicate-
-  coordinate detection, community reports + admin review which already
-  exists via `TagReport`/admin queue, and eventually the real AI photo
-  verification).
+## Tag detail page — several fixes/additions this session
 
-## Admin-editable settings (new: `site_settings` table + `/admin/settings`)
+`templates/tag_detail.html` / `endpoints/tags.py`:
 
-Prompted by the user asking for every hardcoded "meter or other threshold"
-value across the project to be DB-backed and admin-editable. Implemented as
-a generic key/value settings system, not one column per value:
+- **Description editing was actually broken before this session**: the
+  edit textarea only rendered when the description was *empty* — once you
+  set one, there was no way to ever change it again through the UI (only
+  through direct `POST`). Fixed: the owner always sees the editable
+  textarea (pre-filled with the current value), non-owners see plain text.
+- **Delete button** (new) — soft-delete, see "Deletion policy" above, with
+  a styled confirmation modal (not native `confirm()`).
+- **Self-report blocked** — both server-side (`report_tag()` now 403s if
+  `tag_point.submitted_by_id == current_user.id`) and in the UI (report
+  button hidden for your own tag).
+- **"View on map" button** (new) — `tags.map_view` now accepts optional
+  `?lat=&lon=` query params; if present and valid, that becomes the map
+  center at zoom 17 instead of the usual band-average/default center. The
+  tag detail page links here with its own coordinates.
+- **"Meglátogatás"/"Visit" button also added to the tag detail page**
+  itself (previously only reachable from the map marker's popup) — hidden
+  for your own tag (see the `TagVisit` note in "Data model" above for the
+  self-visit block).
+- **Description textarea**: `style="resize:none"` (was freely resizable,
+  looked odd on mobile).
 
-- **`library/models/site_setting.py`** — `SiteSetting(key: str primary key,
-  value: float)`. Only admin *overrides* live here; a key with no row falls
-  back to its built-in default.
-- **`library/services/settings_service.py`** — `SettingsService`, with
-  `DEFAULT_SETTINGS` (the single source of truth for every key + its
-  default) and `get(key)` / `get_int(key)` / `get_all()` / `set(key, value)`.
-  Labels/descriptions shown in the admin UI are NOT here — they're
-  `t("setting.<key>_label")` / `t("setting.<key>_description")` in
-  `translations.py`, same as every other user-facing string in this app.
-- **`/admin/settings`** (`endpoints/admin.py`) — a 4th admin nav tab (queue /
-  users / bands / **settings**), one form with a number input per setting,
-  short label + description under each, one Save button. POST parses every
-  submitted value as float and calls `settings_service.set()` for each,
-  logs an `AdminAction(action_type="update_settings")`.
-- **11 settings currently registered** (`SettingsService.DEFAULT_SETTINGS` /
-  `SETTINGS_DISPLAY_ORDER` in `admin.py`): `tag_radius_meters` (100),
-  `cluster_link_multiplier` (4), `log_visit_max_distance_meters` (10),
-  `max_travel_speed_kmh` (130), `teleport_distance_tolerance_meters` (50),
-  `local_leaderboard_radius_km` (25), `overpass_timeout_seconds` (25),
-  `username_min_length` (3), `username_max_length` (24), `poll_min_options`
-  (2), `poll_max_options` (4). `EARTH_RADIUS_METERS`/`EARTH_RADIUS_KM`
-  (physical constants, not thresholds) were deliberately left hardcoded.
-- **`TerritoryEngine.from_settings()`** (classmethod, `territory_engine.py`)
-  builds an engine from the current `tag_radius_meters`/`cluster_link_multiplier`
-  settings — every `TerritoryEngine(...)` call site in the codebase (7 of
-  them: `tags.py`, `admin.py` x2, `bands.py` x3, `seed_data.py`) now goes
-  through this instead of the class's hardcoded defaults. **This incidentally
-  fixed a real pre-existing bug**: 6 of those 7 call sites were plain
-  `TerritoryEngine()` with no `radius_meters` arg at all, silently ignoring
-  whatever the configured radius was supposed to be — only `tags.py`'s
-  `finalize()` ever actually passed it through. Now they're all consistent.
-- **`UsernameValidator.MIN_LENGTH`/`MAX_LENGTH`** changed from class
-  attributes to `@property` methods that call `SettingsService` at access
-  time (not at `__init__`, since these validators are instantiated as
-  module-level singletons at import time in `auth.py`/`bands.py`/`profile.py`,
-  before the DB/app-context is guaranteed ready — only the property
-  *access*, which always happens inside a request, touches the DB). One
-  caller (`auth.py`'s `_unique_username`) referenced `UsernameValidator.MAX_LENGTH`
-  as a **class**-level attribute, which broke once it became a property —
-  fixed to use the existing `username_validator` instance instead.
-- **`library/config.py`**'s old `tag_radius_meters` and `main.py`'s
-  `app.config["TAG_RADIUS_METERS"]` were removed entirely — static
-  `app.config` set once at startup can't reflect live admin edits without a
-  restart, so every read site now calls `SettingsService` directly instead.
-- **Same idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` pattern** as
-  the teleport-detection columns applies here too, except `site_settings` is
-  a *brand-new* table, so plain `db.create_all()` handles it - no ALTER
-  needed, just the model import added to `main.py`'s `create_app()`.
-- Verified end-to-end: rebuilt the app (confirmed `site_settings` table
-  exists), called the `/admin/settings` POST view function directly with
-  a full form payload, confirmed values persisted and were read back via
-  `SettingsService.get()`, then deleted the test override rows so the local
-  DB is back on defaults.
+## Leaderboard — "national" scope reworked to GPS-based "Nationality"
 
-## Dev tool: raw geotagged photo capture (`/dev/capture`)
+Renamed the tab from "Országos"/"National" to "**Nemzetiség**"/"**Nationality**"
+this session, and changed what determines it: it used to read the viewer's
+**profile-set** `nationality_code`; now it reverse-geocodes the viewer's
+**live browser GPS position** via Nominatim
+(`LeaderboardService.country_code_from_location(lat, lon)`, a new method —
+`nominatim.openstreetmap.org/reverse`, `format=jsonv2`, needs a descriptive
+`User-Agent` same as the existing Overpass integration or you risk a 4xx).
+The endpoint (`/api/leaderboard?scope=national`) now requires `lat`/`lon`
+query params (like the `local` scope already did) instead of trusting
+`current_user.nationality_code`; the frontend (`leaderboard.html`) requests
+geolocation for this tab the same way the "Helyi"/"Local" tab always has.
+Verified live against real coordinates (Budapest → `HU`).
 
-A dev utility (`endpoints/dev_capture.py` + `templates/dev_capture.html`) for
-quickly collecting real geotagged test photos — completely separate from the
-game's tag-submission flow, no `Image`/`TagPoint` rows, no verification, not
-linked from anywhere in the UI (fixed path, but no auth/token gate).
+## Navigation: back buttons now use real browser history
 
-- **First version of this had a secret-token URL** (`/dev/capture/<token>`,
-  gated on a `DEV_CAPTURE_TOKEN` env var) — the user explicitly rejected that
-  as overcomplicated ("mi a faszom a kód... egyetlen publikus egyszerű
-  megnyitható végpont legyen") and it was ripped back out same-session. Don't
-  reintroduce token/env-var gating here unless asked again — the route is now
-  just a plain fixed path, `/dev/capture`, no config needed anywhere, works
-  identically on any deployment the moment the code is live.
-- **Page flow**: on load, requests geolocation first, then — only once a fix
-  succeeds — opens the live camera (`getUserMedia`, same pattern as the tag
-  submission/log pages). Tapping the shutter draws the frame to a canvas,
-  uploads immediately, shows a 1.5s "Saved: <filename>" toast, then the
-  camera stays live for the next shot — deliberately loop-friendly for
-  quickly gathering many test photos in one session, not single-shot.
-- **No verification of any kind** — no distance/proximity check, no teleport
-  check, no auth, no `Image` DB row, no content hashing. This is intentional;
-  it's a raw capture tool, not a game action.
-- **Filename = coordinates + exact capture time**, not content-hash based
-  (unlike every other upload path in this app, which goes through
-  `ImageStorage`'s sha256-hash naming): `{lat:.6f}_{lon:.6f}_{YYYYMMDD_HHMMSS_mmm}.jpg`,
-  e.g. `47.497913_19.040236_20260828_154512_123.jpg`. The timestamp is the
-  client-side moment of the shutter tap (`new Date().toISOString()`, sent as
-  `captured_at`), not server receive time.
-- Saved directly to `assets/images/dev_captures/` (bypasses `ImageStorage`
-  entirely — a plain `photo.save()` to a computed path) — falls under the
-  existing `assets/images/` gitignore rule and is automatically servable via
-  the existing generic `/assets/images/<path:relative_path>` route since
-  that route just does `send_from_directory` on anything under `IMAGES_ROOT`.
-- Verified end-to-end with a real Flask test client: `GET /dev/capture` →
-  200, `POST /dev/capture/upload` → 200 with the file written to disk under
-  the exact expected filename. Test artifact cleaned up after.
+**Found and fixed a real UX bug reported by the user**: every `app-header-back`
+"go back" chevron button across ~16 templates used a hardcoded `href` to a
+fixed "logical parent" page (e.g. tag detail always linked back to the map,
+regardless of whether you'd actually arrived from the feed, a profile, or
+search) — so "back" often didn't return you to where you'd actually come
+from. `profile.html` already had the correct fix in one spot
+(`<button onclick="history.back()">`) from some earlier point; **this
+session applied the same fix everywhere else**: `band_create.html`,
+`band_detail.html`, `band_settings.html`, `chat_conversation.html`,
+`chat_inbox.html`, `profile_edit.html`, `tag_detail.html`, and all 5 admin
+sub-pages (`admin/bands.html`, `admin/model.html`, `admin/queue.html`,
+`admin/settings.html`, `admin/users.html` — these also cross-link to each
+other via nav tabs, so a fixed "back to profile" was wrong there too, not
+just from external entry points).
 
-## New feature: tag likes → removed, comments added, description added
+**Deliberately NOT changed**: the camera pages' (`tag_submit_upload.html`,
+`tag_log_upload.html`, `tag_search_upload.html`, `tutorial_step.html`) X-icon
+"cancel/close" buttons — those aren't history-based "back" navigation, they
+represent "abandon this flow" with one single sensible fixed destination
+(there's only ever one place you can enter those flows from), so a fixed
+href is correct there, don't "fix" it into `history.back()`.
 
-Order of events across rounds, in case it matters for git-blame archaeology:
-1. Likes AND text comments were added together (`TagLike`, `TagComment` models,
-   like-toggle button + comment list on tag detail page).
-2. A later round explicitly said "remove the like feature, no longer needed" —
-   fully removed: model file deleted, endpoint deleted, template button/script
-   deleted, translation key deleted, `main.py` import deleted.
-3. Comments stayed and are still live. The report-tag button was moved to sit
-   right below the "area added" stat and above the comments section (was
-   previously at the very bottom, below comments).
-4. Tag description field added (see above).
+## Band detail page — header icon buttons, leave confirmation, cleanup
 
-## New feature: "visited tags" + log-a-tag + tag search (all partially stubbed by design)
+`templates/band_detail.html`:
 
-The user's own framing: **the actual AI matching/validation logic for these
-is intentionally deferred** ("a kép feltöltés és logolás logikáját később
-valósítom meg") — build the UI/data shell now, wire up real verification later.
+- **Settings and Leave buttons moved into the header's top-right icon slot**
+  (`header_action` block, same `.app-header-back` circular-icon style as
+  everywhere else) instead of full-width buttons in the page body. Settings
+  (gear icon) only shows for the leader; Leave (door icon) shows for any
+  member.
+- **Leave now opens a styled confirmation modal** instead of submitting
+  immediately (same pattern as the tag-delete modal).
+- **"Csatlakozási kérések"/join-requests card only renders when there's
+  actually a pending request** — it used to always render for the leader
+  when `join_policy == "request"`, showing an empty "no requests" message
+  most of the time; now the condition includes `and pending_requests`, and
+  the now-unreachable "no requests" fallback text was removed.
+- **The "Chat" button is now full-width** (`btn-block`) — it used to sit in
+  a `justify-content:center` flex row alongside the (now-moved) settings/
+  leave buttons and looked oddly narrow once those were gone.
 
-- **Log a visit**: every tag marker's map popup has a "Log" button
-  (`/tags/<id>/log`, GET/POST) — upload a photo, it's saved and a `TagVisit`
-  row is created immediately, no real matching against the tag yet (same
-  "auto-accept for now" pattern as tag submission itself).
-- **Profile page**: two tabs, "Recent submissions" / "Visited tags"
-  (`.segmented` control + JS toggle, `#submissionsTab` / `#visitedTab`), the
-  visited tab is an infinite-scroll list fetching
-  `/api/users/<username>/visited-tags`. A new profile stat shows the
-  visited-tag count.
-- **Tag search** (separate feature, different button): a second header
-  button on the map page (stacked vertically under the existing
-  local-leaderboard-sheet toggle button) opens `/tags/search` — upload a
-  photo, it's saved, and the user is told the matching feature is "coming
-  soon" (`flash.tag_search_coming_soon`). **No search/matching logic exists
-  yet at all** — this is a pure UI stub per explicit instruction ("csak a
-  gombot rakd oda és valósítsd meg a kép feltöltés oldalt - a további
-  funkciókat majd később valósítom meg").
+## Map — "locate me" button
 
-## Profile page features: life-path / band history
+New floating circular button, bottom-right of `#mainMap` on `map.html`
+(`.map-locate-btn`, positioned above the safe-area inset, styled to match
+the existing header-icon-button look). On click: `getCurrentPosition()`,
+then `liveMap.flyTo([lat, lon], 16)` (animated pan/zoom, not an instant
+jump). Shows a spinning-icon loading state while waiting, disables itself
+entirely if `navigator.geolocation` doesn't exist, shows an alert on
+permission-denied/failure.
 
-Since `TagPoint.band_id` already stays fixed to whatever band a user was in
-*when they made that tag* (see data model note on `User`), the "Recent
-submissions" tab groups the 6 most recent tags and inserts a **divider row**
-(spanning the full grid width) whenever the sequence crosses from one band
-to an older one — NOT a per-thumbnail band label (that was tried first and
-explicitly rejected: "ne legyen mindegyik alatt ott hogy melyik bandához
-tartozik, csak egy elválasztó sor legyen"). Real test data exists for this:
-`feralscorpion8361` has tags across 3 different bands in the seed database
-(their current band, plus older tags manually seeded into two other bands
-with earlier timestamps) — useful for visually testing this feature without
-needing to actually simulate a user leaving/joining bands live.
+## Map tiles decision (unchanged, still true)
 
-**Bug found and fixed via this same test data**: `contribution_percent` on
-the profile page was computed as `(all-time approved tags, any band) /
-(current band's total approved tags)` — once a user has tag history in
-*previous* bands, that numerator can exceed the denominator, producing
-nonsense like 141.5%. Fixed: the numerator is now `approved_in_current_band`
-(filtered by both `submitted_by_id` AND `band_id == user.band_id`).
+Current state: **standard OpenStreetMap raster tiles**, dark-themed via a
+CSS `filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9)
+saturate(0.7)` (`.map-tiles-dark img.leaflet-tile`) — this gives a dark
+theme while still showing all POI icons/labels, which CartoDB's `dark_all`
+tiles don't (and that provider now requires an API key anyway, confirmed
+this project already tried and rejected it before). If asked to touch the
+map theme again, this is the approach that satisfies both constraints, no
+need to re-litigate a different tile provider.
 
-## Chat system messages
+## Landmark feature (Overpass API integration) — unchanged
 
-`finalize()` (tag submission) posts a `ChatMessage(message_type="tag_added",
-tag_point_id=..., body=<translated text>)` into the submitting band's own
-conversation. Rendered specially in `app.js`'s `buildChatBubbleBody()`:
-shows the message text, then a clickable row (tag thumbnail + "View tag"
-link) to `/tags/<id>`. Wording (`chat.system_tag_captured` vs.
-`chat.system_tag_reinforced`) depends on `area_added_km2 > 0`.
+6 top-level OSM categories, `LandmarkService.refresh_for_band()`,
+`OVERPASS_HEADERS` needs a descriptive User-Agent or you get 406, the
+public instance is slow/flaky and this is handled gracefully. **Newly
+backgrounded this session** in two more call sites that used to block
+synchronously (admin's report-resolve "remove tag" action, and the new
+submitter-facing tag-delete route) — both now use the same
+`threading.Thread(target=_refresh_landmarks_async, ...)` pattern the
+tag-submission flow already used, since the same "Overpass can take up to
+25s" problem was making admin actions feel broken/hung, not just tag
+submission.
 
-## Feed rework — now tag-only, Instagram-style
+## Tag submission flow — still live-camera + geolocation, now with real-time detection
 
-The feed page (`/feed`) **no longer shows `NewsFeedEvent` rows at all**
-("nem kell ilyen feed hogy mi történik... a feed csak a tageket
-tartalmazza"). `endpoints/feed.py`'s `feed_api()` now queries `TagPoint`
-directly (approved, newest first, joined with submitted_by/band/photo) and
-`feed.html` renders each as a card: avatar+username+band-name header, full
-photo, footer with lat/lon + timestamp — a deliberate Instagram-feed layout.
-`NewsFeedEvent` creation code elsewhere (band created, member joined, tag
-approved) was left in place, not removed — it may now be fully unused
-outside of maybe an admin view; verify before assuming it still matters if
-you touch it.
+The core flow described in earlier revisions of this file (live
+`getUserMedia` camera, no file picker, canvas-exported JPEG, immediate
+`getCurrentPosition()`, `client_now` timestamp, teleport check, background
+landmark refresh) is **unchanged in its overall shape** this session — what's
+new is the **client-side YOLO detection gating the shutter button**, see
+"AI / tag detection" above for the full detail. The shutter button is now
+disabled until a qualifying detection is found (green square state), with a
+green pulsing ring animation (`::after` pseudo-element, `transform`/`opacity`
+only — deliberately not `box-shadow`, which forced a main-thread repaint
+every frame and visibly stuttered while the detection loop was also running
+on the main thread; the compositor-only properties don't fight with it).
 
-## Navigation / app-shell layout (current, final state this session)
+## Anti-cheat: teleport-speed detection — unchanged in mechanism, defaults changed, race fixed
 
-Bottom tab bar order: **Map / Bands / [center create button] / Feed /
-Profile** (Leaderboard is no longer a tab — see below). The center slot:
+Same mechanism as before (`_is_teleport()`, `User.last_location_lat/lon/at`
+cache, Haversine speed check). **This session**: the race-condition fix
+(see "Security hardening" above) and default value changes
+(`max_travel_speed_kmh` 130→140, `teleport_distance_tolerance_meters`
+50→15 — see "Key services" for why these are live-effective, not just
+code defaults).
 
-- **Authenticated, civilian**: "+" icon → create a band.
-- **Authenticated, band member**: "+" icon → submit a tag.
-- **Not authenticated**: a "?" icon → `/tutorial/1` (new onboarding flow, see below).
+## Admin-editable settings (`site_settings` table + `/admin/settings`)
 
-This button is now **structurally part of the tab bar** (`.tab-bar-create` /
-`.tab-bar-create-btn`, `position: absolute` inside a `position: relative;
-z-index: 1490` `.tab-bar`), not a `position: fixed` floating element like
-the original `.fab` was. This was a deliberate, two-round fix:
-1. First pass made it part of the bar but the WHOLE bar grew taller (the
-   button's height was stretching its flex-row parent). Fixed by making the
-   button `position: absolute` inside its flex-item slot, so it no longer
-   affects the row's own height — only the button itself pops up above the
-   bar's top edge (tuned to ~1/3 poking above, matching how the old floating
-   FAB used to look).
-2. Second bug: the popped-up top portion rendered **behind** the Leaflet map
-   on the `/map` page specifically. Root cause: `.tab-bar` had a `z-index`
-   declared but **no `position` property**, so the z-index was silently a
-   no-op the whole time (z-index only applies to positioned elements) —
-   Leaflet's internal panes (which use z-index up to ~700 in their own
-   context) were winning. Fixed by adding `position: relative` and bumping
-   to `z-index: 1490` (same convention as the header buttons/bottom sheet
-   elsewhere in this app — search this codebase's history for "Leaflet
-   z-index stacking bug pattern" if this class of bug appears again
-   anywhere else with a Leaflet map on the page, it has happened multiple
-   times independently).
+Same generic key/value system as before — see "Key services" above for the
+current full list (22 keys) and this session's additions/default changes.
+**New 5th admin nav tab**, `/admin/model` — see "AI / tag detection" above.
 
-**Leaderboard** is no longer a bottom tab — it's now a full-width button at
-the top of the Bands list page instead. The local-leaderboard sheet
-(top-right button on the map, opens a bottom sheet) had its "Saját bandád"
-(own-gang member ranking) card removed entirely — that sheet now shows
-*only* the ranking of bands currently visible in the map viewport, and its
-title was reworded to make that scope explicit ("Helyi toplista - a képen
-látható bandák").
+## Dev tool: raw geotagged photo capture (`/dev/capture`) — reaffirmed open, CSRF-fixed
 
-**Zoom +/- control removed** from the main `/map` page specifically (`
-zoomControl: false` passed to that one `initLiveMap()` call) — other map
-instances (band detail mini-map, location pickers) keep it, this was
-scoped intentionally, not a global change.
+Unchanged in purpose and behavior from before (no auth, no `Image`/`TagPoint`
+rows, filename = coordinates + capture time, saved outside `ImageStorage`).
+**This session**: confirmed via a live exploit (see "Security hardening")
+that it accepted non-image files with zero content validation — the user
+explicitly said to leave that as-is ("az ideiglenes", it's temporary) and
+NOT extend `ImageStorage`'s new validation/compression to this tool. The
+one thing that WAS fixed: it's missing the CSRF `<meta>` tag (doesn't
+extend `base.html`), so a manual `csrf_token`/`X-CSRFToken` fix was added
+directly in the template — without it the upload 400'd in production.
 
-**Map center**: when a logged-in band member opens `/map`, it now centers on
-the average lat/lon of their own band's approved tags (falls back to the
-old fixed Budapest default if they have none) — `tags.py`'s `map_view()`
-computes `map_center`, passed into `initLiveMap({center: ...})`.
+## New feature: tag likes → removed, comments added, description added — unchanged, historical
 
-## Accent color = band color (new, site-wide)
+See previous revisions; nothing new here this session beyond the
+description-editing bugfix covered in "Tag detail page" above.
 
-If `current_user.is_authenticated and current_user.band`, `base.html`
-injects an inline `<style>` block (after the `style.css` link, so it wins
-the cascade) overriding the `--pink`/`--purple` CSS custom properties with
-the band's own color + a computed lighter/darker shade of *the same* color
-(`contrast_shade()` in `color_utils.py`, picks lighten vs. darken based on
-the color's own HSL lightness). Since virtually every gradient/accent in
-`style.css` is written as `linear-gradient(135deg, var(--pink), var(--purple))`,
-this single override cascades into buttons, the tab-bar create button, etc.
-automatically. The inline SVG `#tabActiveGradient` (used for the active
-tab-bar icon's gradient stroke) is ALSO made conditional in the same way
-(2-stop band-color gradient instead of the original 3-stop pink/purple/cyan)
-since it's a hardcoded SVG def, not CSS-variable-driven, and wouldn't have
-picked up the override otherwise. `--cyan`/`--yellow`/`--orange` are
-deliberately NOT touched — those are used as distinct data-viz colors
-(e.g. differentiating the 4 profile stat numbers) and overriding them too
-would make stats visually indistinguishable.
+## "Visited tags" + log-a-tag + tag search — unchanged in scope, terminology changed
 
-## Tutorial (new, anonymous-user onboarding, content deliberately stubbed)
+Still deliberately stubbed (no real photo-matching) as described in earlier
+revisions. **This session**: user-facing wording changed from
+"logolás"/"log" to "meglátogatás"/"visit" throughout (see the `TagVisit`
+note in "Data model"), self-visit blocked, rate-limited (see "Rate
+limiting" above). "Tag search" is still a pure UI stub, untouched.
 
-`endpoints/tutorial.py`, `GET /tutorial/<step>` for step 1–4 (404 outside
-that range). Each step: an X-close button (top-right, → `/map`), a step
-counter badge, a placeholder message (`tutorial.step_placeholder` — **no
-real tutorial content has been written yet, this is intentional**, the user
-said content comes later), and either a "Tovább/Next" button (→ next step)
-or, on step 4, a "Kezdjük!/Let's start!" button → `/profile` (where an
-anonymous visitor sees the sign-in CTA). Reached via the tab bar's "?" button
-for anonymous users (see "Navigation" above).
+## Profile page features: life-path / band history — unchanged
 
-## Removed features (don't re-add without being asked)
+See previous revisions, nothing new here this session.
 
-- **The entire `mockup/` folder** — an early static HTML/CSS design mockup
-  from before the real Flask templates existed, never wired to the app
-  (confirmed unused: no references anywhere in `main.py`/`endpoints/`/`templates/`,
-  and it was already excluded from Docker builds via `.dockerignore`). Deleted
-  wholesale, including its own `mockup/js/app.js` and `mockup/css/style.css` —
-  don't recreate a parallel static mockup, the real templates are the design now.
-- **Tag likes** — see above.
-- **Chat unread-message badge/counter** — the little red badge on the
-  Profile tab icon, plus `ChatService.unread_count()`, the
-  `/api/chat/unread-count` endpoint, and the polling JS that refreshed it
-  every 30s — all deleted in one round ("nincs szükség az üzenet
-  értesítésre és a kis jelzésre"). The chat conversation view's own 3-second
-  message polling (a *different* feature, for the active conversation
-  screen) was **not** touched and still works, including a visibility-based
-  pause (stops polling while the tab is backgrounded).
-- **"Create a gang" list-cell button on the profile page** — removed as
-  redundant once the tab-bar center button already covers that entry point
-  for civilians. Was previously `{% if current_user.is_civilian %}` inside
-  the profile's settings-list card; that card is now admin-link-only (and
-  hidden entirely for non-admins, to avoid rendering an empty card).
-- **"Saját bandád" member-ranking card on the map's local-leaderboard
-  sheet** — see "Navigation" above.
+## Chat system messages — unchanged
 
-## AI verification — moved to a separate sub-project, actively being worked on
+See previous revisions, nothing new here this session.
 
-Real tag-photo verification (comparing a submitted photo against a band's
-reference tag photo) is being prototyped in a **separate sibling project**,
-not in this Flask app: `C:\DaBalint\Projects\Python\graffiti_wars_ai\`.
+## Feed rework — unchanged
 
-- Own `.venv`, `requirements.txt` (torch/transformers/opencv/pillow/matplotlib),
-  `main.ipynb`, `library/tag_verifier.py`, `library/shape_matcher.py`.
-- Test assets at `assets/tag/`: `original.jpg` (reference "GRF" tag, hand-drawn
-  purple pen on paper) + `true/` (4 real photos of the same tag, different
-  backgrounds/angles) + `false/` (4 unrelated photos, negative examples).
-- **Approach that worked**: DINOv2 (`facebook/dinov2-small`, CPU-friendly)
-  image embeddings + cosine similarity. **Result: 8/8 correct classification**
-  on the test set, with a clean separation (true scores 0.675–0.785, false
-  scores 0.133–0.487, ~0.19 gap) — a simple midpoint threshold (~0.58)
-  works perfectly on this small sample.
-- **Approach tried and found NOT reliable (kept in code, not used by
-  default)**: contour/Hu-moment shape matching (`ShapeMatcher.distance()`).
-  True and false samples overlapped in shape-distance — likely because the
-  "largest contour" heuristic sometimes grabs background clutter (packaging
-  edges, shadows) instead of the actual ink strokes. Don't assume this is a
-  solved secondary signal; it needs better preprocessing (e.g. isolating
-  ink color specifically) before it would add value.
-- **Key context that shaped the approach**: reference photos may be either
-  a clean/digital sample OR a real photo of the wall (the user confirmed
-  both are possible, not just one), and submitted photos are always real
-  wall photos, possibly at an angle, different lighting/color. This
-  domain-shift concern is why DINOv2 was chosen over classical keypoint
-  matching (ORB/SIFT) as the primary signal — keypoint matching was judged
-  likely to struggle both on the clean-vs-real domain gap AND on graffiti's
-  typically bold/flat-color shapes (fewer strong local keypoints than a
-  richly textured photo).
-- **Not yet done**: integrating this back into the main Flask app at all —
-  it's still a standalone research notebook. Also not done: testing against
-  more than one tag design, building any real precision/recall calibration
-  from actual submitted photos (there are none yet), or the ORB/SIFT
-  third-signal idea floated as a future option for the "two different tags,
-  same style" false-positive case.
+Still tag-only, Instagram-style, `NewsFeedEvent` rows still created
+elsewhere but not read by the feed page. Worth noting: `NewsFeedEvent` rows
+for a disbanded band are **not** cleaned up (see "Deletion policy" above) —
+they'll keep showing historical past-tense entries mentioning a band that
+no longer appears anywhere else; judged acceptable (a historical record),
+not fixed, don't assume this is an oversight.
+
+## Navigation / app-shell layout — unchanged except pinch-zoom + back buttons
+
+See "Security hardening" (pinch-zoom disabled) and "Navigation: back
+buttons" above for this session's two changes. Everything else (tab bar
+layout, center create-button, accent-color-from-band-color, leaderboard
+not being a tab) is unchanged from earlier revisions.
+
+## Tutorial — unchanged
+
+Still stubbed content, unchanged this session.
+
+## Removed features (don't re-add without being asked) — cumulative list
+
+Everything from earlier revisions (the `mockup/` folder, tag likes, chat
+unread badge, the profile page's redundant "create a gang" button, the
+map's "saját bandád" ranking card) **plus, this session**:
+- **The old DINOv2/`graffiti_wars_ai` approach** — not "removed" exactly
+  since it seems to have never existed on this machine in the first place
+  (the path this file used to cite doesn't exist), but don't go looking for
+  it or assume it's still the plan; `gradditi_ai` (YOLOv8, see "AI / tag
+  detection") is the real, current, integrated approach.
+- **Hard-deletion of bands** — replaced by soft-delete, see "Deletion
+  policy" above. If you find any code path that still does
+  `db.session.delete(band)`, that's a regression, not intended behavior.
 
 ## Known bugs fixed this session (don't reintroduce)
 
-- **Territory recompute race condition on cold start**: gunicorn's multiple
-  worker processes each independently ran `create_app()` (and therefore
-  `db.create_all()`) at import time; on a truly empty database, two workers
-  could race to `CREATE TABLE` simultaneously and crash with a Postgres
-  `UniqueViolation` on `pg_type`. Fixed with gunicorn's `--preload` flag
-  (loads the app once in the master before forking workers). Confirmed via
-  server logs on the actual home-server deployment before the fix, and via
-  a clean restart with no crash after.
-- **Google OAuth `redirect_uri_mismatch` behind the reverse proxy**: Flask
-  didn't know it was behind an HTTPS-terminating nginx proxy, so
-  `url_for(_external=True)` generated `http://` even though the real
-  request came in over `https://`. Fixed with `ProxyFix` in `main.py`
-  (`x_for=1, x_proto=1, x_host=1`).
-- **Comment-post button wrapping onto its own line**: a global mobile rule,
-  `@media (max-width: 640px) { .flex { flex-wrap: wrap } }`, combined with
-  `input[type="text"] { width: 100% }`, forced the comment form's submit
-  button below the input on any phone-width screen. Fixed locally on that
-  one form (`flex-wrap: nowrap` on the form, `flex: 1; width: auto` on the
-  input) rather than touching the shared `.flex` utility (which is
-  deliberately wrap-on-mobile elsewhere, e.g. button groups).
-- **`contribution_percent` > 100%** — see "Profile page features" above.
-- **Tab-bar create-button z-index / height bugs** — see "Navigation" above.
+- **Admin/self tag-removal felt "broken" (very slow, and the tag stayed
+  visible on the map)**: the slowness was `landmark_service.refresh_for_band()`
+  running synchronously (blocking on Overpass, up to ~25s) in both the
+  report-resolve admin action and the new submitter-delete route — fixed by
+  backgrounding it (see "Landmark feature" above). The "still visible on
+  the map" part turned out to be correct behavior, not a bug: the removal
+  itself commits before the slow part even starts, but the already-open map
+  view doesn't auto-refetch tiles/markers without a pan/zoom/reload (no
+  websocket push) — this is expected, not something to "fix" by adding
+  live push updates unless asked.
+- **Camera-page temporal-dead-zone JS bug** — see "AI / tag detection"
+  above, the gray-square-while-loading feature briefly broke everything
+  silently because of `const` declaration order.
+- **`isFullyInsideSquare()` replacing a center-point-only check** — see "AI
+  / tag detection", a box could overflow the target square on one edge
+  while its center was still inside it, and the old check wrongly counted
+  that as "found".
+- **Race condition in teleport anti-cheat** — see "Security hardening".
+- **`/dev/capture` missing CSRF token** — see "Security hardening"/"Dev
+  tool" above.
+- **Synchronous Overpass calls blocking admin/delete requests** — see
+  "Landmark feature" above.
+- All bugs listed in the previous revision of this file (territory-recompute
+  race on cold start, OAuth `redirect_uri_mismatch` behind the proxy, the
+  comment-button flex-wrap bug, `contribution_percent` > 100%, tab-bar
+  z-index/height bugs) remain fixed, nothing regressed them this session.
 
-## Docker deployment
+## Docker deployment — unchanged this session, re-confirm before assuming state
 
-`Dockerfile` (gunicorn `--preload`, see above) + `docker-compose.yml`
-(`web` + `db` services). Deployed on the user's home server:
-container names `graffiti_wars-web-1` / `graffiti_wars-db-1`, published on
-host port **2432** (`web`'s container port 5000 → host 2432), reachable
-publicly at `https://graffiti.balintdaniel.com/` via the user's existing
-nginx proxy manager setup.
+Same `Dockerfile`/`docker-compose.yml` setup as before (gunicorn
+`--preload`, `STORAGE_PATH`-derived volume mounts, container names
+`graffiti-wars-web-1`/`graffiti-wars-db-1` on the home server, host port
+2432). **Confirmed live this session** (via SSH) that the production
+container was already running code from this session's work (checked by
+grepping for `exceeds_rate_limit`/`max_upload_size_mb` inside the running
+container's files) — so deploys via the existing CI/CD pipeline have been
+happening throughout, seemingly automatically on push (the user appears to
+commit/push outside of Claude's own turns; Claude itself never ran `git
+commit`/`git push` this session per the standing "don't auto-commit" rule,
+yet `git log` repeatedly showed new commits already present by the next
+turn). **The `bands.is_deleted`/`deleted_at` migration specifically was
+NOT yet confirmed deployed** as of the end of this session (checked, the
+columns didn't exist on the production DB yet) — it'll apply itself
+automatically via the same idempotent-migration pattern on the next deploy,
+no manual step needed, just don't assume it's live yet without checking.
 
-**Volume host paths, now derived from a single required `STORAGE_PATH` env
-var** (`docker compose` fails fast with a clear error if it's unset — no
-server-specific default is baked into `docker-compose.yml`, deliberately,
-since the repo is public now; see `.env.example`): `${STORAGE_PATH}/database`
-→ Postgres data, `${STORAGE_PATH}/website` → `/app/assets` inside the
-container (note: NOT `/app/assets/images` — the mounted folder becomes the
-parent of the `images/` subfolder the app itself creates). On the actual
-home server this is set to `/STORAGE/docker/graffiti_wars`.
+**The router/VPN went down mid-session** (unrelated to any app change): the
+home router's WireGuard tunnel (`wg0`, OpenWrt, UCI-managed) had a stale
+handshake (~3 hours old despite a 25s persistent-keepalive setting) and
+stopped routing to the home server's LAN — fixed via SSH into the router
+(`ifdown wg0 && ifup wg0`, NOT `wg-quick`, since this interface is
+UCI/netifd-managed, not a raw wg-quick config — confirmed via `uci show
+network.wg0` showing `proto='wireguard'` before touching anything). Not an
+app bug, just worth knowing if "the server seems unreachable" comes up
+again and the site itself is confirmed reachable from outside the home
+network (e.g. via mobile data) — that combination points at the router's
+tunnel, not the server.
 
-**⚠️ This changed the assets mount path from the base `STORAGE_PATH` folder
-itself to a `website` subfolder of it** (was: `/STORAGE/docker/graffiti_wars`
-→ `/app/assets` directly; now: `/STORAGE/docker/graffiti_wars/website` →
-`/app/assets`) — the `database` subfolder mount is unaffected (already had
-its own subfolder, still does). **This means on the actual production
-server, the existing uploaded-images folder needs to be moved** from
-`/STORAGE/docker/graffiti_wars/images` to
-`/STORAGE/docker/graffiti_wars/website/images` before/when this compose
-change is deployed there, or every previously uploaded image will appear
-missing (404 on `/assets/images/...`) even though the files still physically
-exist at the old path, just no longer mounted into the container. As of this
-writing it's unclear whether the user has actually performed this move on
-the live server yet — check before assuming uploaded images work on a fresh
-deploy of this config, and don't touch the `database` subfolder during any
-such move (it's already correctly placed and unaffected).
+## CI/CD (GitHub Actions → Portainer webhook over WireGuard) — unchanged
 
-**Google OAuth for this deployment**: the redirect URI registered in Google
-Cloud Console must be exactly `https://graffiti.balintdaniel.com/auth/google/callback`.
-Google requires HTTPS for anything other than literal `localhost` and
-rejects raw IP addresses as redirect URIs outright — this is why the
-`10.20.30.45:2432` IP:port combo alone can never work for OAuth login, a
-real (sub)domain + HTTPS is mandatory, or `localhost` for same-machine testing.
-
-**A real incident during this work, worth remembering**: while setting up a
-local Docker test of an UNRELATED change, a `cat > .env` command accidentally
-**overwrote the user's real local dev `.env`** (DB credentials + Google OAuth
-secret) with dummy test values, with no backup taken first. The user had to
-manually recover the real values afterward (they did, successfully). Lesson
-already internalized: **never write test/dummy values into a file that might
-be the user's real config — copy it aside first, or write to a separate file
-under the scratchpad directory instead.** Don't repeat this class of mistake.
-
-## CI/CD (GitHub Actions → Portainer webhook over WireGuard)
-
-`.github/workflows/deploy.yml`, one job, triggered on every push to `main`
-(direct commit or merged PR). **There is no build/registry step** — see
-"GHCR + org repo attempt, abandoned" below for why. Portainer's stack is
-Git-linked directly to this repo with `build: .`, so a redeploy re-clones
-and rebuilds the image itself; CI's only job is to *tell* Portainer to do
-that:
-
-- The home server's Portainer isn't publicly reachable, only via WireGuard,
-  so the job installs `wireguard` on the runner, writes the **`WG_CONFIG`**
-  repo secret (the full contents of the user's WireGuard client `.conf`
-  file, split-tunnel to `10.8.0.0/24` + `10.20.30.0/24` via
-  `wireguard.balintdaniel.com:51820`, DNS line stripped since the
-  `openresolv` package `wg-quick` would otherwise need isn't available on
-  the `ubuntu-latest` runner and isn't needed anyway) to
-  `/etc/wireguard/wg0.conf`, brings the tunnel up, `curl -X POST`s the
-  **`PORTAINER_WEBHOOK_URL`** repo secret (a Portainer *stack* redeploy
-  webhook), then tears the tunnel down.
-
-**Two secrets live only in GitHub** (repo Settings → Secrets and variables →
-Actions), never committed, never printed into a chat transcript in full —
-the user added them manually after being told to, not automated by Claude
-(no `gh` CLI or API token was available in-session, and a WireGuard private
-key / webhook URL shouldn't pass through a third party regardless):
-- `WG_CONFIG` — the WireGuard client config content.
-- `PORTAINER_WEBHOOK_URL` — `https://portainer.balintdaniel.com/api/stacks/webhooks/<uuid>`.
-  **These need to be re-added under the `szajbergyerek/graffiti_wars` repo's
-  own secrets** (repo secrets don't carry over between repos) — they were
-  originally added under the now-abandoned `Graffiti-War/website` repo; as
-  of this writing it's unconfirmed whether the user re-added them here yet.
-
-### GHCR + org repo attempt, abandoned this session
-
-The project briefly lived in a new `Graffiti-War` GitHub organization
-(`github.com/Graffiti-War/website`) with a full build-and-push-to-GHCR
-pipeline (`ghcr.io/graffiti-war/website`, `docker-compose.yml`'s `web`
-using `image:` instead of `build: .`, a `WEB_IMAGE` env var). **This was
-fully reverted** — don't reintroduce any of it unasked. What happened, in
-case the org repo idea comes back:
-
-- GHCR pulls themselves were solvable (a **classic** PAT with `read:packages`
-  + `repo` scopes, tested and confirmed working via both `docker login`/`pull`
-  and `git ls-remote` directly against the org repo).
-- **Portainer's Git-repository build method reliably failed** against the
-  org repo specifically — "authentication required: invalid credentials" /
-  "Unable to fetch git repository... failed to list repository refs" —
-  with the *exact same* classic PAT that was independently verified to
-  work fine via plain `git`/`docker` from the command line against that
-  same repo. The identical credentials worked without issue against the
-  user's personal repos in Portainer. This looks like a Portainer ↔
-  GitHub-organization-repo interaction bug (possibly version-specific),
-  not a credentials/scope problem — a fine-grained PAT was also tried and
-  definitively failed (403 on both git and registry) regardless.
-- Rather than keep chasing that, the user said to abandon the org
-  entirely and move back to `https://github.com/szajbergyerek/graffiti_wars`
-  ("hagyjuk az organisatont a fenébe") with a simpler pipeline: no
-  build/registry step at all, Portainer builds locally via its (working)
-  Git link to the personal repo, CI only fires the redeploy webhook.
-- `git remote origin` was pointed back at
-  `https://github.com/szajbergyerek/graffiti_wars.git`; the personal repo's
-  own `main` had drifted one commit ahead in the meantime (a leftover
-  `[skip ci]` stamp-commit from the *even earlier* abandoned
-  commit-hash-stamping workflow, from before the org move) — merged rather
-  than force-pushed, to avoid losing anything, then the stale stamp comment
-  was cleaned out of `docker-compose.yml`'s first line by hand.
-- The `Graffiti-War` org and its `website` repo were **not deleted** —
-  only abandoned/unused. Don't assume they're gone if you see a reference
-  to them somewhere.
+See the previous revision of this file for the full history (including the
+abandoned GHCR/org-repo attempt) — nothing about the pipeline itself was
+touched this session.
 
 - **Every** user-facing string goes in `library/i18n/translations.py` as
   `"key": {"hu": "...", "en": "..."}`. Never hardcode UI text in a template
-  or a `flash()` call.
+  or a `flash()` call. This was maintained rigorously this session even
+  across the huge security/feature batches — every new flash message,
+  button label, and admin setting label/description got a proper `hu`/`en`
+  pair, verified programmatically multiple times (checking the three lists
+  — settings defaults, display order, i18n keys — stay in exact
+  correspondence).
 - English translations say **"Gang"**, not "Crew".
 - Locale is picked automatically from the browser's `Accept-Language`
   header (`g.locale`) — no manual language switcher UI.
-- When you remove a feature, remove its translation keys too (this was done
-  consistently this session — e.g. `tag.like_button`, `map.your_gang_title`,
-  `map.member_ranking_title` were all deleted along with their features).
-  Leftover unused keys are harmless but were kept out on purpose; match that
-  standard going forward.
 
 ## Other notable decisions (still true, unchanged from before)
 
@@ -880,79 +986,69 @@ case the org repo idea comes back:
   `/bands/<id>/settings`.
 - **DM privacy**: `allow_direct_messages` only blocks *new* conversations.
 - **"Local" scope** (leaderboard + bands list): real browser GPS, 25km
-  radius — not viewport, not nationality.
+  radius — not viewport. "Nationality" scope is now also real browser GPS
+  (reverse-geocoded), not viewport and not profile-set anymore — see
+  "Leaderboard" above.
 - Map tag markers are viewport-filtered; territories are not (still fine
   at current scale).
 - `escapeHtml()` in `app.js` — always use it for popup/DOM content built
-  from user data (a real XSS bug was found and fixed with unescaped
-  `band.name` in a Leaflet popup, historically).
+  from user data; now also escapes quotes (see "Security hardening").
 
 ## Local dev setup
 
-- Local PostgreSQL, credentials in the gitignored `.env` (see
-  `.env.example` for the required keys — `SECRET_KEY`, `DATABASE_*`,
-  `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`).
-- Run via `python main.py` (Flask debug mode, port 5000, debug reloader).
+- Local PostgreSQL, credentials in the gitignored `.env`.
+- Run via `python main.py` (Flask debug mode, port 5000, debug reloader) —
+  remember this is the literal code path where `debug=True` is a live risk
+  if ever pointed at a non-throwaway DB, see "Security hardening".
 - Real seed data exists in the local dev database (1111 users, 125 bands,
-  ~3200+ tags, built via `seed_data.py` plus several manual test-data
-  scripts for specific scenarios like the life-path feature — see
-  `feralscorpion8361` note above). This lives only in the local Postgres
-  instance, not in git.
-- **Google login does not work for local testing** unless you browse via
-  literal `http://localhost:<port>` (Google's documented exemption from
-  the HTTPS-required rule) with that exact redirect URI registered in
-  Console, or set up a real HTTPS-served local domain (e.g. via `mkcert` +
-  a hosts-file/router DNS entry) if testing from a phone/second device on
-  the LAN, since `localhost` only resolves to itself. Neither of these was
-  fully set up as of this writing — the user was mid-decision on which
-  approach to use for phone-based local testing when this file was last
-  updated.
-- **`git remote origin` is `https://github.com/szajbergyerek/graffiti_wars.git`**
-  — this is back to being the current/canonical location. It was briefly
-  moved to a new `Graffiti-War` org repo this same session and then moved
-  *back* after the org repo's Portainer integration turned out to be
-  broken — see "GHCR + org repo attempt, abandoned" above for the full
-  story. Don't be surprised by a `Graffiti-War/website` repo still existing
-  on GitHub; it's dead/unused, not the canonical repo.
-  Also removed this session: the whole `mockup/` folder (unused static
-  design mockup, see "Removed features"), a short-lived GitHub Actions
-  workflow that stamped the commit hash into `docker-compose.yml`'s first
-  line (tried, then abandoned before the org-repo move even happened), and
-  the `DEV_AUTO_LOGIN` backdoor-login mechanism (see below).
+  ~3200+ tags via `seed_data.py`, plus manual test-data scripts for
+  specific scenarios).
+- **Google login does not work for local testing** unless via literal
+  `http://localhost:<port>` with that exact redirect URI registered, or a
+  real HTTPS-served local domain for phone/LAN testing. Same unresolved
+  state as before, not addressed this session.
+- `git remote origin` is `https://github.com/szajbergyerek/graffiti_wars.git`.
+- Home-network SSH access used repeatedly this session for live
+  verification/pentesting: the app server (`10.20.30.45`, user `dani`) and
+  the OpenWrt router (`192.168.1.1`, user `root`) — see the user's own
+  top-level Credentials notes (outside this file) for current passwords;
+  `paramiko` was installed/used/uninstalled from the `graffiti_wars` venv
+  each time as a temporary tool, not left as a project dependency — don't
+  add it to `requirements.txt`.
 
-## Removed: `DEV_AUTO_LOGIN` backdoor login
+## Removed: `DEV_AUTO_LOGIN` backdoor login — unchanged, still removed
 
-The local-testing convenience where an unset-Google-login request
-auto-logged in as a fixed admin account (`endpoints/auth.py`'s
-`_dev_auto_login()`/`_get_or_create_dev_admin()`, `DEV_AUTO_LOGIN` env var
-in `Config`/`main.py`) was **fully removed this session** at the user's
-request ("nem kell már hogy magától belépjen egy accountba"). All local
-testing now goes through real Google OAuth — no more backdoor. Don't
-reintroduce this without being explicitly asked again. The `DEV_ADMIN_*`
-identity constants (`DEV_ADMIN_GOOGLE_ID`/`EMAIL`/`USERNAME`) still live at
-the top of `auth.py` and are still used by `seed_data.py` to name its first
-seeded admin user — that part was deliberately left alone, it's just inert
-now (that seeded account has a fake `google_id` like every other seeded
-user, so it was never really "loggable into" except via the now-removed
-backdoor anyway).
+See previous revision for the full story. Still removed, don't reintroduce.
 
 ## How to resume a session with this project
 
 1. Read this file fully, skim `README.md`.
-2. Run `git status` and `git branch -vv` — confirm you're on `main`, confirm
-   nothing is uncommitted before assuming any prior described state is what's
-   actually on disk (this file describes intent and history, not a live guarantee).
+2. Run `git status` and `git log --oneline -10` — confirm you're on `main`,
+   confirm nothing is uncommitted before assuming any prior described state
+   is what's actually on disk. **Also check whether the production server
+   is actually running the latest commit** if anything you're about to do
+   depends on a recent schema/behavior change (SSH in, grep the running
+   container's files, or check `docker inspect ... --format '{{.Created}}'`
+   against `git log` timestamps) — this session found more than once that
+   "is this deployed yet" needed an active check, not an assumption.
 3. Verify specific claims that matter for whatever you're about to touch
    (grep for a function/model before relying on this document blindly) —
    this file is a map, not the territory.
-4. Ask the user what they want to work on next. Their usual workflow this
-   whole project: they write a batch of feature requests/bug reports in
-   Hungarian to a scratch file in the repo root (has been named both
-   `dev_motes.md` and `dev_notes.md` across different rounds — check both,
-   whichever exists/was most recently edited is the live one), then say
-   something like "olvasd el a dev notesba" / "írtam új feladatokat" to
-   signal a new batch is ready. Expect multi-item batches (5-15+ items per
-   round is normal), implement all of them in one pass, verify locally
-   (in-process Flask test client and/or a briefly-launched local dev server
-   + Playwright screenshot for visual/CSS changes), then summarize back in
-   Hungarian.
+4. **Before extending `TerritoryEngine` or anything band-vs-band
+   competitive**, read "Planned future direction: InkTrail rework" above —
+   the user may want to discuss that instead of building more on the
+   current competitive mechanic.
+5. Ask the user what they want to work on next. Their usual workflow: they
+   write a batch of feature requests/bug reports in Hungarian to
+   `dev_notes.md` in the repo root, then say something like "olvasd el a
+   dev notesba" / "írtam új feladatokat" to signal a new batch is ready.
+   Expect multi-item batches, implement all of them in one pass, verify
+   locally (syntax/AST checks, Jinja template parsing, and — when a local
+   Postgres happens to be reachable — actually importing `main.py` to
+   exercise the real migration/app-boot path), then summarize back in
+   Hungarian. They also sometimes ask for pure discussion/research (no code
+   changes) — e.g. a security review, or a product/market-strategy
+   conversation like the one that produced the InkTrail direction above —
+   don't assume every message wants code written; confirm before touching
+   files if a message reads like open-ended discussion rather than a
+   concrete instruction.

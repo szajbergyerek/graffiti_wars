@@ -1,4 +1,4 @@
-// Graffiti Wars - client-side helpers backed by the real /api endpoints
+// InkTrail - client-side helpers backed by the real /api endpoints
 
 // Every fetch() POST/PUT/PATCH/DELETE call in this app needs a CSRF token
 // (Flask-WTF's CSRFProtect rejects same-origin state-changing requests

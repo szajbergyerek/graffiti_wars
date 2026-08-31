@@ -36,6 +36,7 @@ def _build_profile_context(user: User) -> dict:
         .all()
     )
     visited_count = TagVisit.query.filter_by(visitor_id=user.id).count()
+    territory_area_km2 = round(user.territory.area_km2, 3) if user.territory else 0.0
 
     return {
         "profile_user": user,
@@ -44,6 +45,7 @@ def _build_profile_context(user: User) -> dict:
         "contribution_percent": contribution_percent,
         "recent_tags": recent_tags,
         "visited_count": visited_count,
+        "territory_area_km2": territory_area_km2,
     }
 
 

@@ -31,8 +31,8 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # ---------- Footer ----------
     "footer.rights": {
-        "hu": "© 2026 Graffiti Wars. A feltöltött tartalomért a feltöltő felel.",
-        "en": "© 2026 Graffiti Wars. Uploaders are responsible for their own content.",
+        "hu": "© 2026 InkTrail. A feltöltött tartalomért a feltöltő felel.",
+        "en": "© 2026 InkTrail. Uploaders are responsible for their own content.",
     },
 
     # ---------- Common ----------
@@ -40,7 +40,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "common.members": {"hu": "tag", "en": "members"},
 
     # ---------- Page titles ----------
-    "title.home": {"hu": "Graffiti Wars", "en": "Graffiti Wars"},
+    "title.home": {"hu": "InkTrail", "en": "InkTrail"},
     "title.map": {"hu": "Térkép", "en": "Map"},
     "title.bands": {"hu": "Bandák", "en": "Gangs"},
     "title.band_create": {"hu": "Új banda", "en": "New gang"},
@@ -61,8 +61,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": 'TAG THE CITY.<br/><span class="accent">CLAIM</span> THE <span class="accent2">TERRITORY.</span>',
     },
     "home.lead": {
-        "hu": "Hozz létre bandát, jelöld meg a tageteket a térképen, és szerezz területet minden felfestett munkával. Valós helyszínek, élő verseny.",
-        "en": "Form a gang, mark your tags on the map, and claim territory with every piece you paint. Real locations, live competition.",
+        "hu": "Hozz létre bandát, jelöld meg a tageteket a térképen, és fedj le területet minden felfestett munkával. Valós helyszínek, élő térkép.",
+        "en": "Form a gang, mark your tags on the map, and cover territory with every piece you paint. Real locations, a live map.",
     },
     "home.cta_join": {"hu": "Csatlakozom", "en": "Join now"},
     "home.cta_open_map": {"hu": "Térkép megnyitása", "en": "Open the map"},
@@ -73,8 +73,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "home.stat_users": {"hu": "Regisztrált játékos", "en": "Registered players"},
     "home.map_title": {"hu": "Élő térkép", "en": "Live map"},
     "home.map_sub": {
-        "hu": "Nézd meg élőben, mely bandák uralják jelenleg a várost.",
-        "en": "See live which gangs currently rule the city.",
+        "hu": "Nézd meg élőben, mely bandák fedik le jelenleg a várost.",
+        "en": "See live which gangs currently cover the city.",
     },
     "home.map_open_full": {"hu": "Teljes térkép megnyitása", "en": "Open the full map"},
     "home.leaderboard_title": {"hu": "Toplista", "en": "Leaderboard"},
@@ -86,8 +86,8 @@ STRINGS: dict[str, dict[str, str]] = {
     "home.feed_title": {"hu": "Hírfal", "en": "Feed"},
     "home.feed_sub": {"hu": "Amit a bandák most csinálnak.", "en": "What the gangs are up to right now."},
     "home.feed_empty": {
-        "hu": "Még nem történt semmi - kezdődjön a háború!",
-        "en": "Nothing has happened yet - let the war begin!",
+        "hu": "Még nem történt semmi - fesd fel az első tagedet!",
+        "en": "Nothing has happened yet - paint your first tag!",
     },
 
     # ---------- Map page ----------
@@ -171,6 +171,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "profile.stat_contribution": {"hu": "Hozzájárulás a bandához", "en": "Contribution to gang"},
     "profile.stat_submitted": {"hu": "Összes beadvány", "en": "Total submissions"},
     "profile.stat_visited": {"hu": "Meglátogatott tagek", "en": "Visited tags"},
+    "profile.stat_area": {"hu": "Lefedett terület", "en": "Covered area"},
     "profile.recent_title": {"hu": "Legutóbbi beadványok", "en": "Recent submissions"},
     "profile.visited_title": {"hu": "Meglátogatott tagek", "en": "Visited tags"},
     "profile.former_gang_divider": {"hu": "Korábbi banda: {band}", "en": "Former gang: {band}"},
@@ -622,9 +623,13 @@ STRINGS: dict[str, dict[str, str]] = {
     "chat.view_tag_link": {"hu": "Tag megtekintése", "en": "View tag"},
 
     # ---------- Leaderboard page ----------
+    "leaderboard.entity_band": {"hu": "Bandák", "en": "Gangs"},
+    "leaderboard.entity_individual": {"hu": "Egyéni", "en": "Individual"},
     "leaderboard.tab_global": {"hu": "Globális", "en": "Global"},
     "leaderboard.tab_national": {"hu": "Nemzetiség", "en": "Nationality"},
     "leaderboard.tab_local": {"hu": "Helyi", "en": "Local"},
+    "leaderboard.tag_unit": {"hu": "tag", "en": "tags"},
+    "leaderboard.no_civilian_hint": {"hu": "Nincs bandában", "en": "No gang"},
     "leaderboard.no_nationality": {
         "hu": "Nem sikerült megállapítani, melyik országban tartózkodsz. Próbáld újra.",
         "en": "Couldn't determine which country you're in. Please try again.",

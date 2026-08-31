@@ -1,10 +1,10 @@
-# Graffiti Wars
+# InkTrail
 
-Graffiti Wars is a mobile-first web game where crews ("bandák") battle for
+InkTrail is a mobile-first web game where crews ("bandák") cover
 real-world map territory by photographing graffiti tags at actual physical
-locations. Every tag your crew photographs and gets approved grows your
-territory on a live map — and rival crews can push back and reclaim ground
-you've already taken.
+locations. Every tag you photograph and get approved grows your own
+coverage on a live map, and your crew's territory is simply the combined
+coverage of all its members — no one can take another crew's ground away.
 
 **Play now**: [graffiti.balintdaniel.com](https://graffiti.balintdaniel.com/)
 

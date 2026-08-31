@@ -109,7 +109,7 @@ def google_callback():
     session.permanent = True
     login_user(user, remember=True)
     if is_new_user:
-        return redirect(url_for("profile.my_profile"))
+        return redirect(url_for("tutorial.tutorial_step", step=1))
     return redirect(url_for("tags.map_view"))
 
 

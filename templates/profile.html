@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if is_own_profile %}{{ t('nav.profile') }}{% else %}{{ profile_user.username }}{% endif %} - Graffiti Wars{% endblock %}
+{% block title %}{% if is_own_profile %}{{ t('nav.profile') }}{% else %}{{ profile_user.username }}{% endif %} - InkTrail{% endblock %}
 {% block header_nav %}
 {% if not is_own_profile %}
 <button type="button" class="app-header-back" onclick="history.back()">
@@ -37,7 +37,7 @@
 {% block content %}
 {% if is_own_profile and not current_user.is_authenticated %}
 <div class="signin-hero">
-  <img src="{{ url_for('static', filename='img/logo-wordmark.png') }}" alt="Graffiti Wars" />
+  <img src="{{ url_for('static', filename='img/logo-wordmark.png') }}" alt="InkTrail" />
   <p>{{ t('home.lead') }}</p>
   <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-block">{{ t('home.cta_join') }}</a>
 </div>
@@ -87,6 +87,7 @@
     <div class="stat-row-item"><div class="stat-value stat-yellow">{{ contribution_percent }}%</div><div class="stat-label">{{ t('profile.stat_contribution') }}</div></div>
     <div class="stat-row-item"><div class="stat-value stat-purple">{{ submitted }}</div><div class="stat-label">{{ t('profile.stat_submitted') }}</div></div>
     <div class="stat-row-item"><div class="stat-value stat-cyan">{{ visited_count }}</div><div class="stat-label">{{ t('profile.stat_visited') }}</div></div>
+    <div class="stat-row-item"><div class="stat-value">{{ territory_area_km2 }} km2</div><div class="stat-label">{{ t('profile.stat_area') }}</div></div>
   </div>
 
   {% if is_own_profile %}
