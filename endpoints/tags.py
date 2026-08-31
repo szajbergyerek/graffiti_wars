@@ -386,13 +386,17 @@ def delete_tag(tag_id: int):
     if tag_point.submitted_by_id != current_user.id:
         abort(403)
 
-    affected_band = tag_point.band
+    affected_band_id = tag_point.band_id
     tag_point.status = "removed"
     tag_point.removed_reason = "Deleted by submitter"
     db.session.commit()
 
     TerritoryEngine.from_settings().recompute_all()
-    landmark_service.refresh_for_band(affected_band)
+    threading.Thread(
+        target=_refresh_landmarks_async,
+        args=(current_app._get_current_object(), affected_band_id),
+        daemon=True,
+    ).start()
 
     flash(t("flash.tag_deleted"), "success")
     return redirect(url_for("tags.map_view"))

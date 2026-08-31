@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ t('title.admin_model') }} - Graffiti Wars{% endblock %}
 {% block header_nav %}
-<a href="{{ url_for('profile.my_profile') }}" class="app-header-back">
+<button type="button" class="app-header-back" onclick="history.back()">
   <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-</a>
+</button>
 {% endblock %}
 {% block header_title %}{{ t('nav.admin') }}{% endblock %}
 {% block tab_bar %}{% endblock %}

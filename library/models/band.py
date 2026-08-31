@@ -31,6 +31,11 @@ class Band(db.Model):
     nationality_code = db.Column(db.String(2), nullable=True)
     founder_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Disbanding never erases a band - it just gets hidden from every listing.
+    # The row, its tags, chat history, and everything else tied to it stays
+    # in the database for later use.
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
     members = db.relationship("User", back_populates="band", foreign_keys="User.band_id")
     tag_points = db.relationship("TagPoint", back_populates="band", foreign_keys="TagPoint.band_id")

@@ -1,11 +1,25 @@
 {% extends "base.html" %}
 {% block title %}{{ band.name }} - Graffiti Wars{% endblock %}
 {% block header_nav %}
-<a href="{{ url_for('bands.list_bands') }}" class="app-header-back">
+<button type="button" class="app-header-back" onclick="history.back()">
   <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-</a>
+</button>
 {% endblock %}
 {% block header_title %}{{ band.name }}{% endblock %}
+{% block header_action %}
+{% if current_user.is_authenticated and current_user.band_id == band.id %}
+<div style="display:flex; gap:8px">
+  {% if is_leader %}
+  <a href="{{ url_for('bands.band_settings', band_id=band.id) }}" class="app-header-back" aria-label="{{ t('band.settings_button') }}">
+    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+  </a>
+  {% endif %}
+  <button type="button" class="app-header-back" onclick="toggleModal('leaveConfirmModalBackdrop')" aria-label="{{ t('band.leave_button') }}">
+    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+  </button>
+</div>
+{% endif %}
+{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
@@ -46,16 +60,7 @@
 
   {% if current_user.is_authenticated %}
     {% if current_user.band_id == band.id %}
-      <div class="flex gap-12 mb-32" style="justify-content:center">
-        <a href="{{ url_for('chat.start_band', band_id=band.id) }}" class="btn btn-primary">{{ t('nav.chat') }}</a>
-        {% if is_leader %}
-        <a href="{{ url_for('bands.band_settings', band_id=band.id) }}" class="btn btn-secondary">{{ t('band.settings_button') }}</a>
-        {% endif %}
-        <form method="POST" action="{{ url_for('bands.leave_band') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-          <button class="btn btn-secondary">{{ t('band.leave_button') }}</button>
-        </form>
-      </div>
+      <a href="{{ url_for('chat.start_band', band_id=band.id) }}" class="btn btn-primary btn-block mb-32">{{ t('nav.chat') }}</a>
     {% elif current_user.is_civilian and band.join_policy == "open" %}
       <form method="POST" action="{{ url_for('bands.join_band', band_id=band.id) }}" class="mb-32">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
@@ -73,7 +78,7 @@
     {% endif %}
   {% endif %}
 
-  {% if is_leader and band.join_policy == "request" %}
+  {% if is_leader and band.join_policy == "request" and pending_requests %}
   <div class="card mb-32">
     <h2 style="font-size:16px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('band.requests_title') }}</h2>
     {% for join_request in pending_requests %}
@@ -90,8 +95,6 @@
         </form>
       </div>
     </div>
-    {% else %}
-    <p class="text-muted">{{ t('band.no_requests') }}</p>
     {% endfor %}
   </div>
   {% endif %}
@@ -140,6 +143,25 @@
     </table>
   </div>
 </div>
+
+{% if current_user.is_authenticated and current_user.band_id == band.id %}
+<div class="modal-backdrop" id="leaveConfirmModalBackdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 style="font-size:16px; font-family:var(--font-body); font-weight:800">{{ t('band.leave_button') }}</h3>
+      <button type="button" class="modal-close" onclick="toggleModal('leaveConfirmModalBackdrop')">&times;</button>
+    </div>
+    <p class="text-muted mb-16" style="font-size:14px">{{ t('band.confirm_leave') }}</p>
+    <form method="POST" action="{{ url_for('bands.leave_band') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div class="flex gap-8">
+        <button type="button" class="btn btn-secondary btn-block" onclick="toggleModal('leaveConfirmModalBackdrop')">{{ t('tag.cancel_button') }}</button>
+        <button type="submit" class="btn btn-danger btn-block">{{ t('band.leave_button') }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 {% block extra_scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

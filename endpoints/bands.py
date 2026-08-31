@@ -10,7 +10,6 @@ from library.i18n.countries import COUNTRIES, COUNTRY_BY_CODE
 from library.models.band import BAND_COLOR_PALETTE, JOIN_POLICIES, Band
 from library.models.band_join_request import BandJoinRequest
 from library.models.band_territory import BandTerritory
-from library.models.chat_message import ChatMessage
 from library.models.conversation import Conversation
 from library.models.conversation_participant import ConversationParticipant
 from library.models.landmark import Landmark
@@ -35,7 +34,9 @@ settings_service = SettingsService()
 
 
 def _query_bands(query_text, sort_key, scope, join_policy_filter, lat=None, lon=None):
-    bands = Band.query.options(joinedload(Band.territory), selectinload(Band.members))
+    bands = Band.query.filter(Band.is_deleted.is_(False)).options(
+        joinedload(Band.territory), selectinload(Band.members)
+    )
 
     if query_text:
         bands = bands.filter(Band.name.ilike(f"%{query_text}%"))
@@ -181,6 +182,8 @@ def create_band():
 @bp_bands.route("/<int:band_id>")
 def band_detail(band_id: int):
     band = Band.query.get_or_404(band_id)
+    if band.is_deleted:
+        abort(404)
     member_count = User.query.filter_by(band_id=band.id).count()
     total_approved = TagPoint.query.filter_by(band_id=band.id, status="approved").count()
     territory = db.session.get(BandTerritory, band.id)
@@ -278,6 +281,8 @@ def band_landmarks_api(band_id: int):
 @login_required
 def join_band(band_id: int):
     band = Band.query.get_or_404(band_id)
+    if band.is_deleted:
+        abort(404)
     if not current_user.is_civilian:
         flash(t("flash.already_member"), "error")
         return redirect(url_for("bands.band_detail", band_id=band_id))
@@ -296,6 +301,8 @@ def join_band(band_id: int):
 @login_required
 def request_join(band_id: int):
     band = Band.query.get_or_404(band_id)
+    if band.is_deleted:
+        abort(404)
     if not current_user.is_civilian:
         flash(t("flash.already_member"), "error")
         return redirect(url_for("bands.band_detail", band_id=band_id))
@@ -393,28 +400,37 @@ def _require_leader(band: Band) -> None:
 
 
 def _delete_band(band: Band) -> None:
-    """Permanently delete a band and everything that references it."""
+    """
+    Disband a band without erasing anything - every deletion in this app is
+    logical only. The band, its tags, its chat history and everything else
+    tied to it stays in the database (and any files stay on disk) for later
+    use; this just hides all of it from the game and marks the band's own
+    tags as removed so they drop off the map/territory like any other
+    removed tag. Pending join requests are the one exception - they're
+    disposable, not content, so those are actually deleted.
+    """
     for member in list(band.members):
         member.band_id = None
         member.band_role = None
         member.band_joined_at = None
 
-    TagPoint.query.filter_by(band_id=band.id).delete()
-    BandJoinRequest.query.filter_by(band_id=band.id).delete()
-    Landmark.query.filter_by(band_id=band.id).delete()
-    NewsFeedEvent.query.filter_by(band_id=band.id).delete()
+    TagPoint.query.filter_by(band_id=band.id, status="approved").update(
+        {"status": "removed", "removed_reason": "Band disbanded"}
+    )
+    BandJoinRequest.query.filter_by(band_id=band.id, status="pending").delete()
 
     band_conversation = Conversation.query.filter_by(kind="band", band_id=band.id).first()
     if band_conversation is not None:
-        ChatMessage.query.filter_by(conversation_id=band_conversation.id).delete()
+        # Only the "who currently sees this conversation" membership is
+        # cleared - the conversation and every message in it stay intact.
         ConversationParticipant.query.filter_by(conversation_id=band_conversation.id).delete()
-        db.session.delete(band_conversation)
 
-    db.session.delete(band)
+    band.is_deleted = True
+    band.deleted_at = datetime.utcnow()
 
 
 def _delete_band_if_empty(band: Band) -> bool:
-    """Delete a band that no longer has any members. Returns True if it was deleted."""
+    """Disband a band that no longer has any members. Returns True if it was disbanded."""
     if User.query.filter_by(band_id=band.id).count() > 0:
         return False
     _delete_band(band)

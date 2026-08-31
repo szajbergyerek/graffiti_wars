@@ -143,6 +143,10 @@ def create_app() -> Flask:
         db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_location_lat DOUBLE PRECISION"))
         db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_location_lon DOUBLE PRECISION"))
         db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_location_at TIMESTAMP"))
+        db.session.execute(
+            text("ALTER TABLE bands ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE")
+        )
+        db.session.execute(text("ALTER TABLE bands ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP"))
         db.session.commit()
 
     return app

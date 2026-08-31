@@ -1,4 +1,5 @@
 import os
+import threading
 from datetime import datetime
 from functools import wraps
 
@@ -10,11 +11,8 @@ from library.extensions import db
 from library.models.admin_action import AdminAction
 from library.models.band import Band
 from library.models.band_join_request import BandJoinRequest
-from library.models.chat_message import ChatMessage
 from library.models.conversation import Conversation
 from library.models.conversation_participant import ConversationParticipant
-from library.models.landmark import Landmark
-from library.models.news_feed_event import NewsFeedEvent
 from library.models.tag_point import TagPoint
 from library.models.tag_report import TagReport
 from library.models.user import User
@@ -28,6 +26,27 @@ landmark_service = LandmarkService()
 settings_service = SettingsService()
 
 MODEL_FILENAME = "tag_detector.onnx"
+
+
+def _refresh_landmarks_async(app, band_id: int) -> None:
+    """
+    Re-fetch a band's OpenStreetMap landmarks in a background thread.
+
+    The public Overpass API can take up to its own 25s timeout to respond (or
+    longer to fail), which is far too slow to hold up the admin's request for
+    - this runs it off the request thread instead, same as the tag-submission flow.
+
+    param app: The real Flask app object (not the `current_app` proxy, which
+        isn't valid outside a request context) needed to open a fresh app context.
+    param band_id: The id of the band whose landmarks should be refreshed.
+
+    :return: None.
+    """
+    with app.app_context():
+        band = db.session.get(Band, band_id)
+        if band is not None:
+            landmark_service.refresh_for_band(band)
+
 
 # Display order for the admin settings page - game-balance/anti-cheat values first, validation limits after.
 SETTINGS_DISPLAY_ORDER = [
@@ -112,7 +131,7 @@ def resolve_report(report_id: int):
     action = request.form.get("action")
 
     if action == "remove_tag":
-        affected_band = report.tag_point.band
+        affected_band_id = report.tag_point.band_id
         report.tag_point.status = "removed"
         report.tag_point.removed_reason = report.reason
         db.session.add(
@@ -130,7 +149,11 @@ def resolve_report(report_id: int):
 
     if action == "remove_tag":
         TerritoryEngine.from_settings().recompute_all()
-        landmark_service.refresh_for_band(affected_band)
+        threading.Thread(
+            target=_refresh_landmarks_async,
+            args=(current_app._get_current_object(), affected_band_id),
+            daemon=True,
+        ).start()
 
     flash(t("flash.report_closed"), "success")
     return redirect(url_for("admin.queue"))
@@ -199,7 +222,8 @@ def bands_api():
     offset = request.args.get("offset", type=int, default=0)
     limit = min(request.args.get("limit", type=int, default=10), 50)
     all_bands = (
-        Band.query.options(joinedload(Band.territory), selectinload(Band.members))
+        Band.query.filter(Band.is_deleted.is_(False))
+        .options(joinedload(Band.territory), selectinload(Band.members))
         .order_by(Band.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -224,21 +248,28 @@ def bands_api():
 def delete_band(band_id: int):
     band = Band.query.get_or_404(band_id)
 
+    # Every deletion in this app is logical only - disbanding hides the band
+    # and everything tied to it from the game without erasing any of it.
+    # Pending join requests are the one exception - they're disposable, not
+    # content, so those are actually deleted.
     for member in list(band.members):
         member.band_id = None
         member.band_role = None
         member.band_joined_at = None
 
-    TagPoint.query.filter_by(band_id=band.id).delete()
-    BandJoinRequest.query.filter_by(band_id=band.id).delete()
-    Landmark.query.filter_by(band_id=band.id).delete()
-    NewsFeedEvent.query.filter_by(band_id=band.id).delete()
+    TagPoint.query.filter_by(band_id=band.id, status="approved").update(
+        {"status": "removed", "removed_reason": "Band disbanded by admin"}
+    )
+    BandJoinRequest.query.filter_by(band_id=band.id, status="pending").delete()
 
     band_conversation = Conversation.query.filter_by(kind="band", band_id=band.id).first()
     if band_conversation is not None:
-        ChatMessage.query.filter_by(conversation_id=band_conversation.id).delete()
+        # Only the "who currently sees this conversation" membership is
+        # cleared - the conversation and every message in it stay intact.
         ConversationParticipant.query.filter_by(conversation_id=band_conversation.id).delete()
-        db.session.delete(band_conversation)
+
+    band.is_deleted = True
+    band.deleted_at = datetime.utcnow()
 
     db.session.add(
         AdminAction(
@@ -247,7 +278,6 @@ def delete_band(band_id: int):
             target_description=f"Band #{band.id} ({band.name})",
         )
     )
-    db.session.delete(band)
     db.session.commit()
 
     TerritoryEngine.from_settings().recompute_all()

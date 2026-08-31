@@ -134,6 +134,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "band.create_submit": {"hu": "Banda létrehozása", "en": "Create gang"},
     "band.founded_on": {"hu": "Alapítva: {date}", "en": "Founded: {date}"},
     "band.leave_button": {"hu": "Kilépés a bandából", "en": "Leave the gang"},
+    "band.confirm_leave": {
+        "hu": "Biztosan kilépsz a bandából?",
+        "en": "Are you sure you want to leave the gang?",
+    },
     "band.join_button": {"hu": "Csatlakozás", "en": "Join"},
     "band.request_join_button": {"hu": "Csatlakozás kérése", "en": "Request to join"},
     "band.request_pending": {"hu": "A kérésed elbírálás alatt.", "en": "Your request is pending approval."},
