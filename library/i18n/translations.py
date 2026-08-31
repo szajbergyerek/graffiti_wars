@@ -345,6 +345,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "tag.detail_band": {"hu": "Banda", "en": "Gang"},
     "tag.detail_uploaded_at": {"hu": "Feltöltve", "en": "Uploaded at"},
     "tag.detail_area_added": {"hu": "Ezzel hozzáadott terület", "en": "Territory added by this tag"},
+    "tag.view_on_map_button": {"hu": "Megnézem a térképen", "en": "View on map"},
     "tag.description_placeholder": {"hu": "Adj hozzá egy leírást...", "en": "Add a description..."},
     "tag.description_save_button": {"hu": "Leírás mentése", "en": "Save description"},
     "tag.delete_button": {"hu": "Tag törlése", "en": "Delete tag"},

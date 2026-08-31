@@ -131,7 +131,7 @@
   }
 
   const liveMap = initLiveMap("mainMap", {
-    zoom: 13,
+    zoom: {{ map_zoom | tojson }},
     center: {{ map_center | tojson }} || undefined,
     zoomControl: false,
     viewportFiltered: true,

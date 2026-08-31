@@ -171,16 +171,24 @@ def _refresh_landmarks_async(app, band_id: int) -> None:
 
 @bp_tags.route("/map")
 def map_view():
-    map_center = None
-    if current_user.is_authenticated and not current_user.is_civilian:
-        own_points = TagPoint.query.filter_by(band_id=current_user.band_id, status="approved").all()
-        if own_points:
-            map_center = [
-                sum(p.lat for p in own_points) / len(own_points),
-                sum(p.lon for p in own_points) / len(own_points),
-            ]
+    lat = request.args.get("lat", type=float)
+    lon = request.args.get("lon", type=float)
+    map_zoom = 13
 
-    return render_template("map.html", map_center=map_center)
+    if lat is not None and lon is not None and _is_valid_coordinate(lat, lon):
+        map_center = [lat, lon]
+        map_zoom = 17
+    else:
+        map_center = None
+        if current_user.is_authenticated and not current_user.is_civilian:
+            own_points = TagPoint.query.filter_by(band_id=current_user.band_id, status="approved").all()
+            if own_points:
+                map_center = [
+                    sum(p.lat for p in own_points) / len(own_points),
+                    sum(p.lon for p in own_points) / len(own_points),
+                ]
+
+    return render_template("map.html", map_center=map_center, map_zoom=map_zoom)
 
 
 def _get_own_pending_image(image_id: int) -> Image:

@@ -48,6 +48,8 @@
     <div class="stat-row-item"><div class="stat-value" style="color:{{ tag_point.band.color }}">{{ area_added_km2 }} km2</div><div class="stat-label">{{ t('tag.detail_area_added') }}</div></div>
   </div>
 
+  <a href="{{ url_for('tags.map_view', lat=tag_point.lat, lon=tag_point.lon) }}" class="btn btn-secondary btn-block mb-24">{{ t('tag.view_on_map_button') }}</a>
+
   {% if current_user.is_authenticated and current_user.id != tag_point.submitted_by_id %}
   <a href="{{ url_for('tags.log_visit', tag_id=tag_point.id) }}" class="btn btn-primary btn-block mb-24">{{ t('tag.log_button') }}</a>
   {% endif %}
