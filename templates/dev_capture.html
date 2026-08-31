@@ -206,10 +206,13 @@
 
       if (DEBUG_SHOW_DETECTION_BOX && debugDisplayRect) {
         overlayCtx.save();
-        overlayCtx.strokeStyle = "rgba(255, 204, 0, 0.95)";
+        overlayCtx.strokeStyle = "rgba(200, 200, 200, 0.85)";
         overlayCtx.lineWidth = 2;
         overlayCtx.setLineDash([8, 6]);
-        overlayCtx.strokeRect(debugDisplayRect.x, debugDisplayRect.y, debugDisplayRect.w, debugDisplayRect.h);
+        const debugRadius = Math.min(12, debugDisplayRect.w / 2, debugDisplayRect.h / 2);
+        overlayCtx.beginPath();
+        overlayCtx.roundRect(debugDisplayRect.x, debugDisplayRect.y, debugDisplayRect.w, debugDisplayRect.h, debugRadius);
+        overlayCtx.stroke();
         overlayCtx.restore();
       }
     }
