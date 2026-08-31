@@ -305,6 +305,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Place it inside the marked area",
     },
     "tag.camera_guidance_move_closer": {"hu": "Menj közelebb", "en": "Move closer"},
+    "tag.camera_guidance_move_farther": {"hu": "Menj távolabb", "en": "Move farther away"},
     "tag.camera_model_load_failed": {
         "hu": "Nem sikerült betölteni a tag-felismerő modellt. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
         "en": "Couldn't load the tag-detection model. Check your internet connection and try again.",

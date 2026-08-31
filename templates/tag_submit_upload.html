@@ -44,7 +44,7 @@
   const MODEL_SIZE = 640;
   const CONF_THRESHOLD = 0.5;
   const DETECTION_INTERVAL_MS = 350;
-  const MIN_TAG_AREA_FRACTION = 0.03; // tag smaller than this share of the frame -> too far away
+  const MIN_TAG_AREA_FRACTION = 0.05; // tag smaller than this share of the frame -> too far away
   // The target square sits in a fixed spot at the center of the frame - it
   // never moves to track the detection, the user moves the phone instead.
   const TARGET_SQUARE_FRACTION = 0.62;
@@ -64,6 +64,7 @@
   const guidanceNoTagText = {{ t('tag.camera_guidance_no_tag') | tojson }};
   const guidancePlaceInAreaText = {{ t('tag.camera_guidance_place_in_area') | tojson }};
   const guidanceMoveCloserText = {{ t('tag.camera_guidance_move_closer') | tojson }};
+  const guidanceMoveFartherText = {{ t('tag.camera_guidance_move_farther') | tojson }};
 
   function showMessage(text) {
     wrap.innerHTML =
@@ -316,6 +317,11 @@
     syncOverlaySize();
     const square = getTargetSquare();
     const displayRect = detection ? toDisplayRect(detection) : null;
+    // A box wider or taller than the target square can never fit inside it,
+    // no matter how it's repositioned - that's a distance problem (too
+    // close), not a positioning problem, so it gets its own message instead
+    // of being lumped in with "place it in the area".
+    const overflowsSquare = displayRect != null && (displayRect.w > square.w || displayRect.h > square.h);
     const inArea = displayRect != null && isFullyInsideSquare(displayRect, square);
     const areaFraction = detection
       ? ((detection.x2 - detection.x1) * (detection.y2 - detection.y1)) / (video.videoWidth * video.videoHeight)
@@ -326,6 +332,8 @@
     let guidanceText;
     if (!detection) {
       guidanceText = guidanceNoTagText;
+    } else if (overflowsSquare) {
+      guidanceText = guidanceMoveFartherText;
     } else if (!inArea) {
       guidanceText = guidancePlaceInAreaText;
     } else if (areaFraction < MIN_TAG_AREA_FRACTION) {
