@@ -83,6 +83,7 @@ def tags_geojson():
                     "photo_url": point.photo_image.url if point.photo_image else None,
                     "created_at": point.created_at.isoformat(),
                     "submitted_by": point.submitted_by.username,
+                    "submitted_by_id": point.submitted_by_id,
                 },
             }
         )

@@ -1,5 +1,4 @@
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import current_user
 
 from library.services.leaderboard_service import LeaderboardService
 from library.services.settings_service import SettingsService
@@ -19,9 +18,11 @@ def leaderboard_api():
     scope = request.args.get("scope", "global")
 
     if scope == "national":
-        nationality_code = request.args.get("nationality")
-        if not nationality_code and current_user.is_authenticated:
-            nationality_code = current_user.nationality_code
+        lat = request.args.get("lat", type=float)
+        lon = request.args.get("lon", type=float)
+        if lat is None or lon is None:
+            return jsonify({"error": "no_location"}), 400
+        nationality_code = leaderboard_service.country_code_from_location(lat, lon)
         if not nationality_code:
             return jsonify({"error": "no_nationality"}), 400
         territories = leaderboard_service.national_ranking(nationality_code)

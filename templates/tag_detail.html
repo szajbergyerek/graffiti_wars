@@ -13,14 +13,14 @@
   <img src="{{ tag_point.photo_image.url }}" style="width:100%; border-radius:var(--radius); margin-bottom:16px" />
   {% endif %}
 
-  {% if tag_point.description %}
-  <p class="mb-24">{{ tag_point.description }}</p>
-  {% elif current_user.is_authenticated and current_user.id == tag_point.submitted_by_id %}
+  {% if current_user.is_authenticated and current_user.id == tag_point.submitted_by_id %}
   <form method="POST" action="{{ url_for('tags.update_description', tag_id=tag_point.id) }}" class="mb-24">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-    <textarea name="description" rows="2" maxlength="500" placeholder="{{ t('tag.description_placeholder') }}"></textarea>
+    <textarea name="description" rows="2" maxlength="500" placeholder="{{ t('tag.description_placeholder') }}" style="resize:none">{{ tag_point.description or "" }}</textarea>
     <button type="submit" class="btn btn-secondary btn-sm" style="margin-top:8px">{{ t('tag.description_save_button') }}</button>
   </form>
+  {% elif tag_point.description %}
+  <p class="mb-24">{{ tag_point.description }}</p>
   {% endif %}
 
   <div class="card mb-24">
@@ -48,7 +48,17 @@
     <div class="stat-row-item"><div class="stat-value" style="color:{{ tag_point.band.color }}">{{ area_added_km2 }} km2</div><div class="stat-label">{{ t('tag.detail_area_added') }}</div></div>
   </div>
 
+  {% if current_user.is_authenticated and current_user.id != tag_point.submitted_by_id %}
+  <a href="{{ url_for('tags.log_visit', tag_id=tag_point.id) }}" class="btn btn-primary btn-block mb-24">{{ t('tag.log_button') }}</a>
+  {% endif %}
+
+  {% if not (current_user.is_authenticated and current_user.id == tag_point.submitted_by_id) %}
   <button type="button" class="btn btn-secondary btn-block mb-24" onclick="toggleModal('reportModalBackdrop')">{{ t('tag.report_button') }}</button>
+  {% endif %}
+
+  {% if current_user.is_authenticated and current_user.id == tag_point.submitted_by_id %}
+  <button type="button" class="btn btn-danger btn-block mb-24" onclick="toggleModal('deleteConfirmModalBackdrop')">{{ t('tag.delete_button') }}</button>
+  {% endif %}
 
   <h2 style="font-size:18px; font-family:var(--font-body); font-weight:800" class="mb-16">{{ t('tag.comments_title') }}</h2>
   {% if current_user.is_authenticated %}
@@ -76,10 +86,31 @@
     </form>
   </div>
 </div>
+
+{% if current_user.is_authenticated and current_user.id == tag_point.submitted_by_id %}
+<div class="modal-backdrop" id="deleteConfirmModalBackdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 style="font-size:16px; font-family:var(--font-body); font-weight:800">{{ t('tag.delete_button') }}</h3>
+      <button type="button" class="modal-close" onclick="toggleModal('deleteConfirmModalBackdrop')">&times;</button>
+    </div>
+    <p class="text-muted mb-16" style="font-size:14px">{{ t('tag.confirm_delete') }}</p>
+    <form method="POST" action="{{ url_for('tags.delete_tag', tag_id=tag_point.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div class="flex gap-8">
+        <button type="button" class="btn btn-secondary btn-block" onclick="toggleModal('deleteConfirmModalBackdrop')">{{ t('tag.cancel_button') }}</button>
+        <button type="submit" class="btn btn-danger btn-block">{{ t('tag.delete_button') }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+  const rateLimitedText = {{ t('flash.rate_limited') | tojson }};
+
   function renderComment(comment) {
     const row = document.createElement("div");
     row.className = "flex items-center gap-12";
@@ -125,7 +156,10 @@
       })
         .then((r) => r.json())
         .then((comment) => {
-          if (comment.error) return;
+          if (comment.error) {
+            if (comment.error === "rate_limited") alert(rateLimitedText);
+            return;
+          }
           input.value = "";
           const emptyMessage = commentsList.querySelector("p.text-muted");
           if (emptyMessage) emptyMessage.remove();

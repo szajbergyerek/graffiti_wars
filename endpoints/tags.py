@@ -1,7 +1,7 @@
 import logging
 import math
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -90,6 +90,47 @@ def _is_teleport(user, lat: float, lon: float, now: datetime) -> bool:
     elapsed_seconds = max((now - user.last_location_at).total_seconds(), 1.0)
     implied_speed_kmh = (distance_m / 1000) / (elapsed_seconds / 3600)
     return implied_speed_kmh > settings_service.get("max_travel_speed_kmh")
+
+
+def _exceeds_rate_limit(model, user_field, user_id: int, count_key: str, window_key: str) -> bool:
+    """
+    Check whether a user has already hit an admin-configured rate limit for
+    some action, counting existing rows of the given model within a rolling
+    time window.
+
+    param model: The SQLAlchemy model to count rows of (e.g. TagPoint, TagVisit, TagComment).
+    param user_field: The model's column that references the acting user (e.g. TagPoint.submitted_by_id).
+    param user_id: The current user's id.
+    param count_key: The SettingsService key for the max allowed count.
+    param window_key: The SettingsService key for the time window, in minutes.
+
+    :return: True if the user has already reached or exceeded the limit within the window.
+    """
+    since = datetime.utcnow() - timedelta(minutes=settings_service.get(window_key))
+    recent_count = model.query.filter(user_field == user_id, model.created_at >= since).count()
+    return recent_count >= settings_service.get(count_key)
+
+
+def _has_recent_nearby_tag(user_id: int, lat: float, lon: float) -> bool:
+    """
+    Check whether the user already placed a (non-removed) tag close to this
+    location within the admin-configured cooldown window - stops one person
+    from farming territory by repeatedly re-tagging the same spot.
+
+    param user_id: The submitting user's id.
+    param lat: Latitude of the new tag, in degrees.
+    param lon: Longitude of the new tag, in degrees.
+
+    :return: True if a nearby recent tag from the same user exists.
+    """
+    since = datetime.utcnow() - timedelta(minutes=settings_service.get("duplicate_tag_window_minutes"))
+    radius_m = settings_service.get("duplicate_tag_radius_meters")
+    recent_points = TagPoint.query.filter(
+        TagPoint.submitted_by_id == user_id,
+        TagPoint.created_at >= since,
+        TagPoint.status != "removed",
+    ).all()
+    return any(_distance_meters(lat, lon, point.lat, point.lon) <= radius_m for point in recent_points)
 
 
 def _remember_location(user, lat: float, lon: float, now: datetime) -> None:
@@ -237,6 +278,16 @@ def finalize():
     if lat is None or lon is None or not _is_valid_coordinate(lat, lon):
         return jsonify({"error": "missing_location"}), 400
 
+    if _exceeds_rate_limit(
+        TagPoint, TagPoint.submitted_by_id, current_user.id, "tag_submit_rate_limit_count", "tag_submit_rate_limit_window_minutes"
+    ):
+        flash(t("flash.rate_limited"), "error")
+        return jsonify({"redirect_url": url_for("tags.map_view")})
+
+    if _has_recent_nearby_tag(current_user.id, lat, lon):
+        flash(t("flash.duplicate_tag_nearby"), "error")
+        return jsonify({"redirect_url": url_for("tags.map_view")})
+
     now = datetime.utcnow()
     db.session.refresh(current_user._get_current_object(), with_for_update=True)
     if _is_teleport(current_user, lat, lon, now):
@@ -320,6 +371,25 @@ def update_description(tag_id: int):
     return redirect(url_for("tags.tag_detail", tag_id=tag_id))
 
 
+@bp_tags.route("/tags/<int:tag_id>/delete", methods=["POST"])
+@login_required
+def delete_tag(tag_id: int):
+    tag_point = TagPoint.query.get_or_404(tag_id)
+    if tag_point.submitted_by_id != current_user.id:
+        abort(403)
+
+    affected_band = tag_point.band
+    tag_point.status = "removed"
+    tag_point.removed_reason = "Deleted by submitter"
+    db.session.commit()
+
+    TerritoryEngine.from_settings().recompute_all()
+    landmark_service.refresh_for_band(affected_band)
+
+    flash(t("flash.tag_deleted"), "success")
+    return redirect(url_for("tags.map_view"))
+
+
 @bp_tags.route("/api/tags/<int:tag_id>/comments")
 def list_comments(tag_id: int):
     offset = request.args.get("offset", type=int, default=0)
@@ -354,6 +424,11 @@ def post_comment(tag_id: int):
     if not body:
         return jsonify({"error": "empty_body"}), 400
 
+    if _exceeds_rate_limit(
+        TagComment, TagComment.user_id, current_user.id, "tag_comment_rate_limit_count", "tag_comment_rate_limit_window_minutes"
+    ):
+        return jsonify({"error": "rate_limited"}), 429
+
     comment = TagComment(tag_point_id=tag_id, user_id=current_user.id, body=body)
     db.session.add(comment)
     db.session.commit()
@@ -373,6 +448,9 @@ def post_comment(tag_id: int):
 @login_required
 def report_tag(tag_id: int):
     tag_point = TagPoint.query.get_or_404(tag_id)
+    if tag_point.submitted_by_id == current_user.id:
+        abort(403)
+
     reason = request.form.get("reason", "").strip()[:255]
 
     db.session.add(TagReport(tag_point_id=tag_point.id, reported_by_id=current_user.id, reason=reason))
@@ -388,6 +466,9 @@ def log_visit(tag_id: int):
     tag_point = TagPoint.query.options(joinedload(TagPoint.band), joinedload(TagPoint.photo_image)).get_or_404(
         tag_id
     )
+    if tag_point.submitted_by_id == current_user.id:
+        flash(t("flash.cannot_visit_own_tag"), "error")
+        return redirect(url_for("tags.tag_detail", tag_id=tag_id))
 
     if request.method == "POST":
         photo = request.files.get("photo")
@@ -407,6 +488,14 @@ def log_visit(tag_id: int):
             "log_visit_max_distance_meters"
         ):
             flash(t("tag.log_too_far"), "error")
+            return render_template(
+                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
+            )
+
+        if _exceeds_rate_limit(
+            TagVisit, TagVisit.visitor_id, current_user.id, "tag_visit_rate_limit_count", "tag_visit_rate_limit_window_minutes"
+        ):
+            flash(t("flash.rate_limited"), "error")
             return render_template(
                 "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
             )

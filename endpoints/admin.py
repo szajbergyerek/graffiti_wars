@@ -42,6 +42,17 @@ SETTINGS_DISPLAY_ORDER = [
     "username_max_length",
     "poll_min_options",
     "poll_max_options",
+    "max_upload_size_mb",
+    "image_max_dimension_px",
+    "image_jpeg_quality",
+    "duplicate_tag_radius_meters",
+    "duplicate_tag_window_minutes",
+    "tag_submit_rate_limit_count",
+    "tag_submit_rate_limit_window_minutes",
+    "tag_visit_rate_limit_count",
+    "tag_visit_rate_limit_window_minutes",
+    "tag_comment_rate_limit_count",
+    "tag_comment_rate_limit_window_minutes",
 ]
 
 

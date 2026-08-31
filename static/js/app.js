@@ -357,11 +357,15 @@ function initLiveMap(elementId, options = {}) {
     const [lon, lat] = feature.geometry.coordinates;
     const marker = L.marker([lat, lon], { icon: bandPinIcon(p.color) });
     const logLabel = (window.mapUiLabels && window.mapUiLabels.logButton) || "Log";
+    const isOwnTag = window.currentUserId != null && p.submitted_by_id === window.currentUserId;
+    const logLink = isOwnTag
+      ? ""
+      : `<a href="/tags/${p.id}/log" class="btn btn-secondary btn-sm btn-block" style="margin-top:8px">${escapeHtml(logLabel)}</a>`;
     marker.bindPopup(
       `<a href="/users/${encodeURIComponent(p.submitted_by)}" style="font-weight:700; display:block">${escapeHtml(p.submitted_by)}</a>` +
         `<a href="/bands/${p.band_id}" style="color:${escapeHtml(p.color)}; display:block; font-size:12px">${escapeHtml(p.band_name)}</a>` +
         `<a href="/tags/${p.id}"><img src="${escapeHtml(p.photo_url)}" style="width:190px;border-radius:6px;margin-top:6px" /></a>` +
-        `<a href="/tags/${p.id}/log" class="btn btn-secondary btn-sm btn-block" style="margin-top:8px">${escapeHtml(logLabel)}</a>`
+        logLink
     );
     return marker;
   }

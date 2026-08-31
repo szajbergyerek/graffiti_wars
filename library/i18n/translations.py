@@ -212,7 +212,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "A name and a reference image are required.",
     },
     "flash.band_name_taken": {"hu": "Ilyen nevű banda már létezik.", "en": "A gang with this name already exists."},
-    "flash.unsupported_image": {"hu": "Nem támogatott képformátum.", "en": "Unsupported image format."},
+    "flash.unsupported_image": {
+        "hu": "Nem sikerült feldolgozni a képet - lehet, hogy nem támogatott formátum, vagy túl nagy a fájl.",
+        "en": "Couldn't process the image - it might be an unsupported format, or the file is too large.",
+    },
     "flash.band_created": {"hu": "A banda létrejött!", "en": "The gang has been created!"},
     "flash.already_member": {"hu": "Már tagja vagy egy bandának.", "en": "You're already a member of a gang."},
     "flash.band_closed": {"hu": "Ehhez a bandához nem lehet önállóan csatlakozni.", "en": "You can't join this gang on your own."},
@@ -241,6 +244,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "hu": "Fénykép megadása kötelező.",
         "en": "A photo is required.",
     },
+    "flash.cannot_visit_own_tag": {
+        "hu": "A saját tagedet nem látogathatod meg.",
+        "en": "You can't visit your own tag.",
+    },
     "flash.tag_approved": {
         "hu": "A tag felkerült a térképre! A terület frissült.",
         "en": "The tag is on the map! The territory has been updated.",
@@ -249,7 +256,19 @@ STRINGS: dict[str, dict[str, str]] = {
         "hu": "Köszönjük a jelzést, az admin csapat megvizsgálja.",
         "en": "Thanks for the report, the admin team will look into it.",
     },
-    "flash.tag_logged": {"hu": "Tag logolva!", "en": "Tag logged!"},
+    "flash.rate_limited": {
+        "hu": "Túl sokszor csináltad ezt egy rövid idő alatt. Próbáld újra kicsit később.",
+        "en": "You've done this too many times in a short window. Try again a bit later.",
+    },
+    "flash.duplicate_tag_nearby": {
+        "hu": "Nemrég már raktál le taget ebben a közelben. Várj egy kicsit, mielőtt újat viszel fel ide.",
+        "en": "You recently placed a tag nearby already. Wait a bit before adding another one here.",
+    },
+    "flash.tag_deleted": {
+        "hu": "A tag törölve, a terület frissült.",
+        "en": "The tag has been deleted, the territory has been updated.",
+    },
+    "flash.tag_logged": {"hu": "Látogatás rögzítve!", "en": "Visit recorded!"},
     "flash.tag_search_coming_soon": {
         "hu": "Köszönjük! A keresés funkció hamarosan érkezik.",
         "en": "Thanks! The search feature is coming soon.",
@@ -328,6 +347,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "tag.detail_area_added": {"hu": "Ezzel hozzáadott terület", "en": "Territory added by this tag"},
     "tag.description_placeholder": {"hu": "Adj hozzá egy leírást...", "en": "Add a description..."},
     "tag.description_save_button": {"hu": "Leírás mentése", "en": "Save description"},
+    "tag.delete_button": {"hu": "Tag törlése", "en": "Delete tag"},
+    "tag.confirm_delete": {
+        "hu": "Biztosan törlöd ezt a taget? A hozzá tartozó terület elveszik.",
+        "en": "Are you sure you want to delete this tag? Its territory will be lost.",
+    },
+    "tag.cancel_button": {"hu": "Mégse", "en": "Cancel"},
     "tag.report_button": {"hu": "Tag jelentése", "en": "Report this tag"},
     "tag.confirm_report": {"hu": "Biztosan jelented ezt a taget?", "en": "Are you sure you want to report this tag?"},
     "tag.report_title": {"hu": "Miért jelented ezt a taget?", "en": "Why are you reporting this tag?"},
@@ -338,16 +363,16 @@ STRINGS: dict[str, dict[str, str]] = {
     "tag.comment_placeholder": {"hu": "Írj hozzászólást...", "en": "Write a comment..."},
     "tag.comment_send": {"hu": "Küldés", "en": "Post"},
     "tag.no_comments_yet": {"hu": "Még nincs hozzászólás.", "en": "No comments yet."},
-    "tag.log_button": {"hu": "Logolás", "en": "Log"},
-    "tag.log_title": {"hu": "Tag logolása", "en": "Log this tag"},
+    "tag.log_button": {"hu": "Meglátogatás", "en": "Visit"},
+    "tag.log_title": {"hu": "Tag meglátogatása", "en": "Visit this tag"},
     "tag.log_checking_location": {"hu": "Helyzet ellenőrzése...", "en": "Checking your location..."},
     "flash.teleport_detected": {
         "hu": "Ez a helyzet nem egyeztethető össze az előző, nemrég elfogadott helyzeteddel - túl gyorsnak tűnik az odaérés. Próbáld újra egy kis idő múlva.",
         "en": "This location doesn't line up with your last accepted one - getting here that fast doesn't add up. Try again in a bit.",
     },
     "tag.log_too_far": {
-        "hu": "Túl messze vagy ettől a tagtől ahhoz, hogy logold. Menj a hely közelébe (10 méteren belülre), és próbáld újra.",
-        "en": "You're too far from this tag to log it. Get within 10 meters of the spot and try again.",
+        "hu": "Túl messze vagy ettől a tagtől ahhoz, hogy meglátogasd. Menj a hely közelébe (10 méteren belülre), és próbáld újra.",
+        "en": "You're too far from this tag to visit it. Get within 10 meters of the spot and try again.",
     },
     "tag.search_button": {"hu": "Tag keresése", "en": "Search a tag"},
     "tag.search_title": {"hu": "Melyik bandáé ez a tag?", "en": "Whose tag is this?"},
@@ -396,10 +421,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "hu": "Ennyiszer a tag-sugár távolságon belüli tagek olvadnak egy klaszterbe.",
         "en": "Tags within this many times the tag radius merge into one cluster.",
     },
-    "setting.log_visit_max_distance_meters_label": {"hu": "Logolás max. távolság (m)", "en": "Max log distance (m)"},
+    "setting.log_visit_max_distance_meters_label": {
+        "hu": "Meglátogatás max. távolság (m)",
+        "en": "Max visit distance (m)",
+    },
     "setting.log_visit_max_distance_meters_description": {
-        "hu": "Ilyen távolságon belül kell lenni egy tagtől a logoláshoz.",
-        "en": "You must be within this distance of a tag to log it.",
+        "hu": "Ilyen távolságon belül kell lenni egy tagtől a meglátogatáshoz.",
+        "en": "You must be within this distance of a tag to visit it.",
     },
     "setting.max_travel_speed_kmh_label": {"hu": "Teleport-küszöb (km/h)", "en": "Teleport threshold (km/h)"},
     "setting.max_travel_speed_kmh_description": {
@@ -444,6 +472,88 @@ STRINGS: dict[str, dict[str, str]] = {
     "setting.poll_max_options_description": {
         "hu": "Ennél több válaszlehetőséget levág a szavazás.",
         "en": "Polls are capped at this many options.",
+    },
+    "setting.max_upload_size_mb_label": {"hu": "Max. feltöltés méret (MB)", "en": "Max upload size (MB)"},
+    "setting.max_upload_size_mb_description": {
+        "hu": "Ennél nagyobb képfájlt a rendszer elutasít.",
+        "en": "Image files larger than this are rejected.",
+    },
+    "setting.image_max_dimension_px_label": {
+        "hu": "Kép max. felbontása (px)",
+        "en": "Image max dimension (px)",
+    },
+    "setting.image_max_dimension_px_description": {
+        "hu": "Ennél nagyobb szélességű/magasságú képeket a rendszer kicsinyíti feltöltéskor.",
+        "en": "Images wider or taller than this get downscaled on upload.",
+    },
+    "setting.image_jpeg_quality_label": {"hu": "Kép JPEG minőség", "en": "Image JPEG quality"},
+    "setting.image_jpeg_quality_description": {
+        "hu": "Ilyen minőséggel (0-100) tömöríti a rendszer a feltöltött képeket - kisebb érték kisebb fájlméretet ad.",
+        "en": "Uploaded images are re-compressed at this quality (0-100) - lower means smaller files.",
+    },
+    "setting.duplicate_tag_radius_meters_label": {
+        "hu": "Ismételt tag min. távolság (m)",
+        "en": "Repeat tag min distance (m)",
+    },
+    "setting.duplicate_tag_radius_meters_description": {
+        "hu": "Ekkora körzeten belül ugyanaz a felhasználó nem vihet fel új taget a várakozási időn belül.",
+        "en": "The same user can't add another tag within this distance during the cooldown window.",
+    },
+    "setting.duplicate_tag_window_minutes_label": {
+        "hu": "Ismételt tag várakozási idő (perc)",
+        "en": "Repeat tag cooldown (minutes)",
+    },
+    "setting.duplicate_tag_window_minutes_description": {
+        "hu": "Ennyi ideig kell várnia egy felhasználónak, mielőtt újra taget vihet fel a közeli körzetben.",
+        "en": "A user must wait this long before adding another tag in the nearby area.",
+    },
+    "setting.tag_submit_rate_limit_count_label": {
+        "hu": "Tag feltöltés limit (db)",
+        "en": "Tag submit limit (count)",
+    },
+    "setting.tag_submit_rate_limit_count_description": {
+        "hu": "Ennyi tagot tölthet fel egy felhasználó az alábbi időablakban.",
+        "en": "A user can submit at most this many tags within the time window below.",
+    },
+    "setting.tag_submit_rate_limit_window_minutes_label": {
+        "hu": "Tag feltöltés időablak (perc)",
+        "en": "Tag submit window (minutes)",
+    },
+    "setting.tag_submit_rate_limit_window_minutes_description": {
+        "hu": "A tag feltöltési limit erre az időablakra vonatkozik.",
+        "en": "The tag submit limit applies over this rolling time window.",
+    },
+    "setting.tag_visit_rate_limit_count_label": {
+        "hu": "Tag meglátogatás limit (db)",
+        "en": "Tag visit limit (count)",
+    },
+    "setting.tag_visit_rate_limit_count_description": {
+        "hu": "Ennyi taget látogathat meg egy felhasználó az alábbi időablakban.",
+        "en": "A user can visit at most this many tags within the time window below.",
+    },
+    "setting.tag_visit_rate_limit_window_minutes_label": {
+        "hu": "Tag meglátogatás időablak (perc)",
+        "en": "Tag visit window (minutes)",
+    },
+    "setting.tag_visit_rate_limit_window_minutes_description": {
+        "hu": "A meglátogatási limit erre az időablakra vonatkozik.",
+        "en": "The tag visit limit applies over this rolling time window.",
+    },
+    "setting.tag_comment_rate_limit_count_label": {
+        "hu": "Komment limit (db)",
+        "en": "Comment limit (count)",
+    },
+    "setting.tag_comment_rate_limit_count_description": {
+        "hu": "Ennyi kommentet írhat egy felhasználó az alábbi időablakban.",
+        "en": "A user can post at most this many comments within the time window below.",
+    },
+    "setting.tag_comment_rate_limit_window_minutes_label": {
+        "hu": "Komment időablak (perc)",
+        "en": "Comment window (minutes)",
+    },
+    "setting.tag_comment_rate_limit_window_minutes_description": {
+        "hu": "A komment limit erre az időablakra vonatkozik.",
+        "en": "The comment limit applies over this rolling time window.",
     },
     "admin.queue_title": {"hu": "Moderációs várólista", "en": "Moderation queue"},
     "admin.table_band": {"hu": "Banda", "en": "Gang"},
@@ -508,11 +618,11 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # ---------- Leaderboard page ----------
     "leaderboard.tab_global": {"hu": "Globális", "en": "Global"},
-    "leaderboard.tab_national": {"hu": "Országos", "en": "National"},
+    "leaderboard.tab_national": {"hu": "Nemzetiség", "en": "Nationality"},
     "leaderboard.tab_local": {"hu": "Helyi", "en": "Local"},
     "leaderboard.no_nationality": {
-        "hu": "Állíts be nemzetiséget a profilodon az országos toplista megtekintéséhez.",
-        "en": "Set a nationality on your profile to see the national leaderboard.",
+        "hu": "Nem sikerült megállapítani, melyik országban tartózkodsz. Próbáld újra.",
+        "en": "Couldn't determine which country you're in. Please try again.",
     },
     "leaderboard.requesting_location": {"hu": "Helymeghatározás folyamatban...", "en": "Requesting your location..."},
     "leaderboard.location_denied": {

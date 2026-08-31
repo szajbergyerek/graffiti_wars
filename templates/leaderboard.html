@@ -108,13 +108,24 @@
     if (scope === "global") {
       lbStartInfiniteList("scope=global");
     } else if (scope === "national") {
-      fetch("/api/leaderboard?scope=national&limit=1").then((r) => {
-        if (r.status === 400) {
-          lbShowMessage(lbMessages.noNationality);
-          return;
-        }
-        lbStartInfiniteList("scope=national");
-      });
+      lbShowMessage(lbMessages.requestingLocation);
+      if (!navigator.geolocation) {
+        lbShowMessage(lbMessages.locationDenied);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const params = `scope=national&lat=${position.coords.latitude}&lon=${position.coords.longitude}`;
+          fetch(`/api/leaderboard?${params}&limit=1`).then((r) => {
+            if (r.status === 400) {
+              lbShowMessage(lbMessages.noNationality);
+              return;
+            }
+            lbStartInfiniteList(params);
+          });
+        },
+        () => lbShowMessage(lbMessages.locationDenied)
+      );
     } else if (scope === "local") {
       lbShowMessage(lbMessages.requestingLocation);
       if (!navigator.geolocation) {

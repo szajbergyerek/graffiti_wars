@@ -55,6 +55,7 @@
   window.mapUiLabels = {
     logButton: {{ t('tag.log_button') | tojson }},
   };
+  window.currentUserId = {{ current_user.id | tojson if current_user.is_authenticated else "null" }};
 
   const territoriesByBand = {};
   let visibleBandIds = new Set();

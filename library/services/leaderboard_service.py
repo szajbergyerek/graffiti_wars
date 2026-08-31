@@ -1,7 +1,8 @@
 import json
 import math
-from typing import List
+from typing import List, Optional
 
+import requests
 from shapely.geometry import shape
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -9,6 +10,8 @@ from library.models.band import Band
 from library.models.band_territory import BandTerritory
 
 EARTH_RADIUS_KM = 6371.0
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
+NOMINATIM_HEADERS = {"User-Agent": "GraffitiWars/1.0 (contact: graffitiwars app)"}
 
 
 class LeaderboardService:
@@ -29,6 +32,29 @@ class LeaderboardService:
         :return: BandTerritory rows sorted by area descending.
         """
         return self._base_query().order_by(BandTerritory.area_km2.desc()).all()
+
+    def country_code_from_location(self, lat: float, lon: float) -> Optional[str]:
+        """
+        Reverse-geocode a point to the ISO 3166-1 alpha-2 code of the country
+        it currently falls in, using the public Nominatim (OpenStreetMap) API.
+
+        param lat: Latitude of the point (e.g. the viewer's current browser geolocation).
+        param lon: Longitude of the point.
+
+        :return: The uppercase country code, or None if it couldn't be resolved.
+        """
+        try:
+            response = requests.get(
+                NOMINATIM_REVERSE_URL,
+                params={"lat": lat, "lon": lon, "format": "jsonv2", "zoom": 3},
+                timeout=5,
+                headers=NOMINATIM_HEADERS,
+            )
+            response.raise_for_status()
+            country_code = response.json().get("address", {}).get("country_code")
+        except (requests.RequestException, ValueError):
+            return None
+        return country_code.upper() if country_code else None
 
     def national_ranking(self, nationality_code: str) -> List[BandTerritory]:
         """
