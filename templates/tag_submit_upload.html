@@ -44,7 +44,7 @@
   const MODEL_SIZE = 640;
   const CONF_THRESHOLD = 0.5;
   const DETECTION_INTERVAL_MS = 350;
-  const MIN_TAG_AREA_FRACTION = 0.05; // tag smaller than this share of the frame -> too far away
+  const MIN_FILL_FRACTION = 0.7; // tag's longer edge must span at least this share of the square's edge
   // The target square sits in a fixed spot at the center of the frame - it
   // never moves to track the detection, the user moves the phone instead.
   const TARGET_SQUARE_FRACTION = 0.62;
@@ -323,10 +323,16 @@
     // of being lumped in with "place it in the area".
     const overflowsSquare = displayRect != null && (displayRect.w > square.w || displayRect.h > square.h);
     const inArea = displayRect != null && isFullyInsideSquare(displayRect, square);
-    const areaFraction = detection
-      ? ((detection.x2 - detection.x1) * (detection.y2 - detection.y1)) / (video.videoWidth * video.videoHeight)
-      : 0;
-    const tagFound = inArea && areaFraction >= MIN_TAG_AREA_FRACTION;
+    // Judging "close enough" by bounding-box AREA fails for thin, elongated
+    // tags (vertical or horizontal lettering): a tall narrow box can have a
+    // tiny area while its long edge already fills the square, so an
+    // area-based check would keep demanding the user move closer - but
+    // doing so only grows the long edge further, pushing it past the
+    // square's edge before the area ever clears the threshold. Comparing
+    // the box's longer edge to the square's edge instead judges size the
+    // same way regardless of aspect ratio, so it doesn't have that dead zone.
+    const fillFraction = displayRect != null ? Math.max(displayRect.w, displayRect.h) / square.w : 0;
+    const tagFound = inArea && fillFraction >= MIN_FILL_FRACTION;
     currentDetection = tagFound ? detection : null;
 
     let guidanceText;
@@ -336,7 +342,7 @@
       guidanceText = guidanceMoveFartherText;
     } else if (!inArea) {
       guidanceText = guidancePlaceInAreaText;
-    } else if (areaFraction < MIN_TAG_AREA_FRACTION) {
+    } else if (fillFraction < MIN_FILL_FRACTION) {
       guidanceText = guidanceMoveCloserText;
     }
 

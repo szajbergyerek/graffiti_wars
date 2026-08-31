@@ -89,7 +89,7 @@
   const MODEL_SIZE = 640;
   const CONF_THRESHOLD = 0.5;
   const DETECTION_INTERVAL_MS = 350;
-  const MIN_TAG_AREA_FRACTION = 0.05; // tag smaller than this share of the frame -> too far away
+  const MIN_FILL_FRACTION = 0.7; // tag's longer edge must span at least this share of the square's edge
   const TARGET_SQUARE_FRACTION = 0.62;
   const SQUARE_CORNER_RADIUS = 28;
   const DEBUG_SHOW_DETECTION_BOX = true;
@@ -345,10 +345,14 @@
       const displayRect = detection ? toDisplayRect(detection) : null;
       const overflowsSquare = displayRect != null && (displayRect.w > square.w || displayRect.h > square.h);
       const inArea = displayRect != null && isFullyInsideSquare(displayRect, square);
-      const areaFraction = detection
-        ? ((detection.x2 - detection.x1) * (detection.y2 - detection.y1)) / (video.videoWidth * video.videoHeight)
-        : 0;
-      const tagFound = inArea && areaFraction >= MIN_TAG_AREA_FRACTION;
+      // Bounding-box AREA fails for thin, elongated tags (vertical/horizontal
+      // lettering) - a tall narrow box can have a tiny area while its long
+      // edge already fills the square, creating a dead zone where moving
+      // closer only makes it overflow before the area ever clears the
+      // threshold. The box's longer edge vs. the square's edge judges size
+      // the same way regardless of aspect ratio.
+      const fillFraction = displayRect != null ? Math.max(displayRect.w, displayRect.h) / square.w : 0;
+      const tagFound = inArea && fillFraction >= MIN_FILL_FRACTION;
       currentDetection = tagFound ? detection : null;
 
       let guidanceText;
@@ -358,7 +362,7 @@
         guidanceText = "Move farther away";
       } else if (!inArea) {
         guidanceText = "Place it inside the marked area";
-      } else if (areaFraction < MIN_TAG_AREA_FRACTION) {
+      } else if (fillFraction < MIN_FILL_FRACTION) {
         guidanceText = "Move closer";
       }
 
