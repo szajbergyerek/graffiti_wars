@@ -499,20 +499,35 @@ input:focus, select:focus, textarea:focus {
   display: flex; justify-content: center;
 }
 .camera-shutter-btn {
+  position: relative;
   width: 72px; height: 72px; border-radius: 999px; background: #fff;
   border: 4px solid rgba(255, 255, 255, 0.4); cursor: pointer; padding: 0;
   transition: border-color 0.2s ease;
 }
 .camera-shutter-btn:active { transform: scale(0.92); }
 .camera-shutter-btn:disabled { opacity: 0.5; }
-.camera-shutter-btn:not(:disabled) {
-  border-color: var(--success);
-  animation: shutter-ready-pulse 1.6s ease-in-out infinite;
+.camera-shutter-btn:not(:disabled) { border-color: var(--success); }
+
+/* A separate pseudo-element ring carries the pulse, animating only
+   transform/opacity (compositor-only properties) instead of box-shadow -
+   box-shadow forces a repaint on every frame, which stutters when the main
+   thread is busy running the detection loop every 350ms. transform/opacity
+   animations run on their own compositor layer and stay smooth regardless
+   of what the main thread is doing. */
+.camera-shutter-btn:not(:disabled)::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid var(--success);
+  animation: shutter-ready-pulse 1.6s ease-out infinite;
+  will-change: transform, opacity;
+  pointer-events: none;
 }
 
 @keyframes shutter-ready-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0.55); }
-  50% { box-shadow: 0 0 0 12px rgba(61, 220, 132, 0); }
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.35); opacity: 0; }
 }
 .camera-message {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
