@@ -39,7 +39,7 @@
   const confidenceMeter = document.getElementById("confidenceMeter");
   const confidenceMeterPointer = document.getElementById("confidenceMeterPointer");
 
-  const MODEL_URL = {{ url_for('static', filename='models/tag_detector.onnx') | tojson }};
+  const MODEL_URL = {{ url_for('assets.serve_model', relative_path='tag_detector.onnx') | tojson }};
   const MODEL_SIZE = 640;
   const CONF_THRESHOLD = 0.5;
   const DETECTION_INTERVAL_MS = 350;

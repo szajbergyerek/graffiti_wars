@@ -19,3 +19,4 @@ class Config:
         self.google_client_id = os.environ["GOOGLE_CLIENT_ID"]
         self.google_client_secret = os.environ["GOOGLE_CLIENT_SECRET"]
         self.images_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "images")
+        self.models_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "models")

@@ -43,6 +43,7 @@ def create_app() -> Flask:
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["MAX_CONTENT_LENGTH"] = config.max_content_length
     app.config["IMAGES_ROOT"] = config.images_root
+    app.config["MODELS_ROOT"] = config.models_root
     # Static files (notably the ~12MB tag-detection model) default to a
     # revalidate-every-time cache policy, meaning a network round-trip on
     # every load even when the content hasn't changed. A day-long cache lets

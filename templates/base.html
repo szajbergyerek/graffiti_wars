@@ -106,7 +106,7 @@
   // Warms the browser's HTTP cache with the tag-detection model in the
   // background, so by the time a gang member opens the camera it's already
   // local instead of needing a ~12MB download right at that moment.
-  fetch({{ url_for('static', filename='models/tag_detector.onnx') | tojson }}, { credentials: "omit" }).catch(() => {});
+  fetch({{ url_for('assets.serve_model', relative_path='tag_detector.onnx') | tojson }}, { credentials: "omit" }).catch(() => {});
 </script>
 {% endif %}
 {% block extra_scripts %}{% endblock %}
