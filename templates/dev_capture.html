@@ -84,6 +84,7 @@
   const canvas = document.getElementById("captureCanvas");
   const uploadUrl = {{ url_for('dev_capture.dev_capture_upload') | tojson }};
   const modelUrl = {{ url_for('assets.serve_model', relative_path='tag_detector.onnx') | tojson }};
+  const csrfToken = {{ csrf_token() | tojson }};
 
   const MODEL_SIZE = 640;
   const CONF_THRESHOLD = 0.5;
@@ -394,7 +395,11 @@
         formData.append("captured_at", capturedAt);
 
         try {
-          const response = await fetch(uploadUrl, { method: "POST", body: formData });
+          const response = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrfToken },
+            body: formData,
+          });
           const data = await response.json();
           modalText.textContent = data.ok ? `Saved: ${data.filename}` : "Save failed.";
         } catch (err) {
