@@ -676,6 +676,11 @@ STRINGS: dict[str, dict[str, str]] = {
 
     # ---------- Map sidebar ----------
     "map.sidebar_toggle": {"hu": "Banda infó és toplista", "en": "Crew info & leaderboard"},
+    "map.locate_me": {"hu": "Ugrás a jelenlegi helyzetemre", "en": "Jump to my current location"},
+    "map.location_denied": {
+        "hu": "A helymeghatározás nem engedélyezett vagy nem sikerült.",
+        "en": "Location access was denied or failed.",
+    },
 
     # ---------- Landmarks ----------
     "band.landmarks_title": {"hu": "Területen található helyszínek", "en": "Landmarks in the territory"},
