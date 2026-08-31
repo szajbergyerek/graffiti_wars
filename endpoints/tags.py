@@ -51,6 +51,18 @@ def _distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> floa
     return 2 * EARTH_RADIUS_METERS * math.asin(math.sqrt(a))
 
 
+def _is_valid_coordinate(lat: float, lon: float) -> bool:
+    """
+    Check that a lat/lon pair is within the physically valid range.
+
+    param lat: Latitude in degrees.
+    param lon: Longitude in degrees.
+
+    :return: True if -90 <= lat <= 90 and -180 <= lon <= 180.
+    """
+    return -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0
+
+
 def _is_teleport(user, lat: float, lon: float, now: datetime) -> bool:
     """
     Flag a new location as implausible given the user's last accepted location.
@@ -152,7 +164,10 @@ def submit_tag():
         lat = request.form.get("lat", type=float)
         lon = request.form.get("lon", type=float)
 
-        if photo is None or photo.filename == "" or not client_now_raw or lat is None or lon is None:
+        if (
+            photo is None or photo.filename == "" or not client_now_raw
+            or lat is None or lon is None or not _is_valid_coordinate(lat, lon)
+        ):
             flash(t("flash.tag_missing_fields"), "error")
             return render_template("tag_submit_upload.html")
 
@@ -196,7 +211,7 @@ def processing():
         _get_own_pending_image(image_id)
     except (PermissionError, ValueError):
         return redirect(url_for("tags.submit_tag"))
-    if lat is None or lon is None:
+    if lat is None or lon is None or not _is_valid_coordinate(lat, lon):
         return redirect(url_for("tags.submit_tag"))
 
     return render_template(
@@ -219,10 +234,11 @@ def finalize():
     except ValueError:
         return jsonify({"error": "already_used"}), 400
 
-    if lat is None or lon is None:
+    if lat is None or lon is None or not _is_valid_coordinate(lat, lon):
         return jsonify({"error": "missing_location"}), 400
 
     now = datetime.utcnow()
+    db.session.refresh(current_user._get_current_object(), with_for_update=True)
     if _is_teleport(current_user, lat, lon, now):
         flash(t("flash.teleport_detected"), "error")
         return jsonify({"redirect_url": url_for("tags.map_view")})
@@ -357,7 +373,7 @@ def post_comment(tag_id: int):
 @login_required
 def report_tag(tag_id: int):
     tag_point = TagPoint.query.get_or_404(tag_id)
-    reason = request.form.get("reason", "").strip()
+    reason = request.form.get("reason", "").strip()[:255]
 
     db.session.add(TagReport(tag_point_id=tag_point.id, reported_by_id=current_user.id, reason=reason))
     db.session.commit()
@@ -378,7 +394,7 @@ def log_visit(tag_id: int):
         lat = request.form.get("lat", type=float)
         lon = request.form.get("lon", type=float)
 
-        if photo is None or photo.filename == "" or lat is None or lon is None:
+        if photo is None or photo.filename == "" or lat is None or lon is None or not _is_valid_coordinate(lat, lon):
             flash(t("flash.tag_missing_fields"), "error")
             return render_template(
                 "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
@@ -396,6 +412,7 @@ def log_visit(tag_id: int):
             )
 
         now = datetime.utcnow()
+        db.session.refresh(current_user._get_current_object(), with_for_update=True)
         if _is_teleport(current_user, lat, lon, now):
             flash(t("flash.teleport_detected"), "error")
             return render_template(

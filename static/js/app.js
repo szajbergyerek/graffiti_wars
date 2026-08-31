@@ -72,7 +72,10 @@ function getCsrfToken() {
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text == null ? "" : String(text);
-  return div.innerHTML;
+  // The DOM round-trip above escapes &, <, > for text-node content, but not
+  // " or ' - those only matter inside an HTML attribute value, which several
+  // call sites use this for (e.g. building a form's action/value strings).
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function initInfiniteList(options) {

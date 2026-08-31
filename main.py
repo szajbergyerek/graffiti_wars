@@ -79,6 +79,24 @@ def create_app() -> Flask:
     def _resolve_locale():
         g.locale = translator.resolve_locale(request.accept_languages)
 
+    @app.after_request
+    def _set_security_headers(response):
+        """
+        Attach baseline security headers to every response.
+
+        param response: The outgoing Flask response.
+
+        :return: The same response, with the headers set.
+        """
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        # Only meaningful once the browser has seen it over an actual HTTPS
+        # connection, but harmless to always send - it primes future visits
+        # even before HTTP->HTTPS redirection is set up at the proxy level.
+        response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+        return response
+
     app.register_blueprint(bp_index)
     app.register_blueprint(bp_auth)
     app.register_blueprint(bp_bands)
