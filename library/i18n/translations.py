@@ -38,6 +38,8 @@ STRINGS: dict[str, dict[str, str]] = {
     # ---------- Common ----------
     "common.member": {"hu": "tag", "en": "member"},
     "common.members": {"hu": "tag", "en": "members"},
+    "common.tag": {"hu": "tag", "en": "tag"},
+    "common.tags": {"hu": "tag", "en": "tags"},
 
     # ---------- Page titles ----------
     "title.home": {"hu": "InkTrail", "en": "InkTrail"},
@@ -162,19 +164,20 @@ STRINGS: dict[str, dict[str, str]] = {
     "band.role_member": {"hu": "Tag", "en": "Member"},
 
     # ---------- Profile ----------
-    "profile.civilian": {"hu": "Civil néző", "en": "Civilian spectator"},
+    "profile.civilian": {"hu": "Egyedül játszik", "en": "Playing solo"},
     "profile.member_of": {"hu": "{band} tagja - csatlakozott {date}", "en": "Member of {band} - joined {date}"},
     "profile.admin_badge": {"hu": "Admin", "en": "Admin"},
     "profile.leader_badge": {"hu": "Banda vezető", "en": "Gang leader"},
-    "profile.stat_approved": {"hu": "Pontok", "en": "Points"},
+    "profile.stat_tags": {"hu": "Tagek", "en": "Tags"},
     "profile.stat_acceptance_rate": {"hu": "Elfogadási arány", "en": "Acceptance rate"},
     "profile.stat_contribution": {"hu": "Hozzájárulás a bandához", "en": "Contribution to gang"},
-    "profile.stat_submitted": {"hu": "Összes beadvány", "en": "Total submissions"},
     "profile.stat_visited": {"hu": "Meglátogatott tagek", "en": "Visited tags"},
     "profile.stat_area": {"hu": "Lefedett terület", "en": "Covered area"},
-    "profile.recent_title": {"hu": "Legutóbbi beadványok", "en": "Recent submissions"},
+    "profile.map_title": {"hu": "Térkép", "en": "Map"},
+    "profile.recent_title": {"hu": "Saját tagek", "en": "My tags"},
     "profile.visited_title": {"hu": "Meglátogatott tagek", "en": "Visited tags"},
     "profile.former_gang_divider": {"hu": "Korábbi banda: {band}", "en": "Former gang: {band}"},
+    "profile.solo_tags_divider": {"hu": "Önálló tagek", "en": "Solo tags"},
     "profile.no_tags_yet": {"hu": "Még nincs beadott tag.", "en": "No tags submitted yet."},
     "profile.no_visited_yet": {"hu": "Még nincs meglátogatott tag.", "en": "No visited tags yet."},
     "profile.edit_button": {"hu": "Profil szerkesztése", "en": "Edit profile"},
@@ -187,6 +190,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "profile.field_avatar_help": {"hu": "Hagyd üresen, ha nem változtatod.", "en": "Leave empty to keep the current one."},
     "profile.field_banner": {"hu": "Banner kép", "en": "Banner image"},
     "profile.field_nationality": {"hu": "Nemzetiség", "en": "Nationality"},
+    "profile.field_color": {"hu": "Saját szín", "en": "Your color"},
     "profile.nationality_none": {"hu": "Nincs megadva", "en": "Not set"},
     "profile.save_button": {"hu": "Mentés", "en": "Save"},
 
@@ -220,6 +224,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "flash.unsupported_image": {
         "hu": "Nem sikerült feldolgozni a képet - lehet, hogy nem támogatott formátum, vagy túl nagy a fájl.",
         "en": "Couldn't process the image - it might be an unsupported format, or the file is too large.",
+    },
+    "flash.no_tag_detected": {
+        "hu": "Nem sikerült tag-et felismerni a képen - próbáld újra úgy, hogy jól látszódjon a fotón.",
+        "en": "Couldn't recognize a tag in the photo - try again with the tag clearly in frame.",
     },
     "flash.band_created": {"hu": "A banda létrejött!", "en": "The gang has been created!"},
     "flash.already_member": {"hu": "Már tagja vagy egy bandának.", "en": "You're already a member of a gang."},
@@ -274,10 +282,6 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "The tag has been deleted, the territory has been updated.",
     },
     "flash.tag_logged": {"hu": "Látogatás rögzítve!", "en": "Visit recorded!"},
-    "flash.tag_search_coming_soon": {
-        "hu": "Köszönjük! A keresés funkció hamarosan érkezik.",
-        "en": "Thanks! The search feature is coming soon.",
-    },
 
     # ---------- Tutorial ----------
     "tutorial.title": {"hu": "Bemutató", "en": "Tutorial"},
@@ -296,6 +300,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "flash.band_deleted": {"hu": "Banda törölve.", "en": "Gang deleted."},
 
     # ---------- News feed ----------
+    "feed.solo_tag": {"hu": "Önálló tag", "en": "Solo tag"},
     "feed.band_created": {"hu": "Új banda alakult: {band}", "en": "A new gang has formed: {band}"},
     "feed.member_joined": {"hu": "{username} csatlakozott: {band}", "en": "{username} joined {band}"},
     "feed.tag_approved": {"hu": "{band} új tagot rakott fel ({username})", "en": "{band} added a new tag ({username})"},
@@ -349,7 +354,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "tag.detail_submitted_by": {"hu": "Feltöltötte", "en": "Uploaded by"},
     "tag.detail_band": {"hu": "Banda", "en": "Gang"},
     "tag.detail_uploaded_at": {"hu": "Feltöltve", "en": "Uploaded at"},
-    "tag.detail_area_added": {"hu": "Ezzel hozzáadott terület", "en": "Territory added by this tag"},
     "tag.view_on_map_button": {"hu": "Megnézem a térképen", "en": "View on map"},
     "tag.description_placeholder": {"hu": "Adj hozzá egy leírást...", "en": "Add a description..."},
     "tag.description_save_button": {"hu": "Leírás mentése", "en": "Save description"},
@@ -382,12 +386,10 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "tag.search_button": {"hu": "Tag keresése", "en": "Search a tag"},
     "tag.search_title": {"hu": "Melyik bandáé ez a tag?", "en": "Whose tag is this?"},
-    "tag.search_help": {
-        "hu": "Tölts fel egy fotót egy tagről, és megkeressük, melyik banda taggelte.",
-        "en": "Upload a photo of a tag and we'll figure out which gang made it.",
+    "tag.search_coming_soon": {
+        "hu": "Ez a funkció még nem elérhető - hamarosan érkezik.",
+        "en": "This feature isn't available yet - coming soon.",
     },
-    "tag.search_field_photo": {"hu": "Fénykép a tagről", "en": "Photo of the tag"},
-    "tag.search_submit_button": {"hu": "Keresés", "en": "Search"},
 
     # ---------- Admin panel ----------
     "admin.nav_queue": {"hu": "Várólista", "en": "Queue"},
@@ -669,10 +671,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "band.search_placeholder": {"hu": "Keresés név alapján...", "en": "Search by name..."},
     "band.search_button": {"hu": "Keresés", "en": "Search"},
     "band.sort_label": {"hu": "Rendezés", "en": "Sort by"},
-    "band.sort_newest": {"hu": "Legújabb", "en": "Newest"},
-    "band.sort_oldest": {"hu": "Legrégebbi", "en": "Oldest"},
+    "band.sort_newest": {"hu": "Létrehozás ideje szerint", "en": "By creation date"},
     "band.sort_area": {"hu": "Terület szerint", "en": "By territory"},
     "band.sort_members": {"hu": "Taglétszám szerint", "en": "By member count"},
+    "band.sort_tags": {"hu": "Feltöltött tagek szerint", "en": "By tags uploaded"},
     "band.filter_label": {"hu": "Csatlakozás szerint", "en": "By joinability"},
     "band.filter_all": {"hu": "Mind", "en": "All"},
     "band.scope_label": {"hu": "Kör", "en": "Scope"},

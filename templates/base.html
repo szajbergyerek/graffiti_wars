@@ -9,17 +9,35 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
-{% if current_user.is_authenticated and current_user.band %}
+<!-- page_accent_color: lets a child template (band detail, another user's
+     profile) theme the page in that band/user's own color, overridden back
+     to the viewer's own color inside .tab-bar below - {% block page_accent_color %}{% endblock %} -->
+{% set viewer_accent_color = current_user.band.color if (current_user.is_authenticated and current_user.band) else (current_user.color if (current_user.is_authenticated and current_user.color != "#ff2e6c") else None) %}
+{% set page_accent_override = (self.page_accent_color() | trim) %}
+{% set page_accent_color = page_accent_override if page_accent_override else viewer_accent_color %}
 <style>
+{% if page_accent_color %}
   :root {
-    --pink: {{ current_user.band.color }};
-    --purple: {{ contrast_shade(current_user.band.color) }};
+    --pink: {{ page_accent_color }};
+    --pink-rgb: {{ hex_to_rgb_triplet(page_accent_color) }};
+    --purple: {{ contrast_shade(page_accent_color) }};
+    --purple-rgb: {{ hex_to_rgb_triplet(contrast_shade(page_accent_color)) }};
   }
-  .tab-bar-item.active svg {
-    filter: drop-shadow(0 0 6px {{ hex_to_rgba(current_user.band.color, 0.5) }});
-  }
-</style>
 {% endif %}
+{% if viewer_accent_color %}
+  .tab-bar-item.active svg {
+    filter: drop-shadow(0 0 6px {{ hex_to_rgba(viewer_accent_color, 0.5) }});
+  }
+  {% if page_accent_override %}
+  .tab-bar {
+    --pink: {{ viewer_accent_color }};
+    --pink-rgb: {{ hex_to_rgb_triplet(viewer_accent_color) }};
+    --purple: {{ contrast_shade(viewer_accent_color) }};
+    --purple-rgb: {{ hex_to_rgb_triplet(contrast_shade(viewer_accent_color)) }};
+  }
+  {% endif %}
+{% endif %}
+</style>
 {% block extra_head %}{% endblock %}
 </head>
 <body class="app-shell">
@@ -27,9 +45,9 @@
 <svg width="0" height="0" style="position:absolute">
   <defs>
     <linearGradient id="tabActiveGradient" x1="0" y1="0" x2="1" y2="1">
-      {% if current_user.is_authenticated and current_user.band %}
-      <stop offset="0%" stop-color="{{ current_user.band.color }}" />
-      <stop offset="100%" stop-color="{{ contrast_shade(current_user.band.color) }}" />
+      {% if viewer_accent_color %}
+      <stop offset="0%" stop-color="{{ viewer_accent_color }}" />
+      <stop offset="100%" stop-color="{{ contrast_shade(viewer_accent_color) }}" />
       {% else %}
       <stop offset="0%" stop-color="#ff2e6c" />
       <stop offset="50%" stop-color="#8c52ff" />
@@ -74,15 +92,9 @@
   </a>
   <div class="tab-bar-create">
     {% if current_user.is_authenticated %}
-      {% if current_user.is_civilian %}
-      <a href="{{ url_for('bands.create_band') }}" class="tab-bar-create-btn" aria-label="{{ t('nav.create_band') }}">
-        <svg viewBox="0 0 24 24" width="24" height="24" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><path d="M5 4h13l-3 4 3 4H5Z"/></svg>
-      </a>
-      {% else %}
       <a href="{{ url_for('tags.submit_tag') }}" class="tab-bar-create-btn" aria-label="{{ t('map.submit_tag_button') }}">
         <svg viewBox="0 0 24 24" width="24" height="24" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
       </a>
-      {% endif %}
     {% else %}
     <a href="{{ url_for('tutorial.tutorial_step', step=1) }}" class="tab-bar-create-btn" aria-label="{{ t('tutorial.title') }}">
       <svg viewBox="0 0 24 24" width="24" height="24" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><path d="M12 17h.01"/></svg>
@@ -101,7 +113,7 @@
 {% endblock %}
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-{% if current_user.is_authenticated and not current_user.is_civilian %}
+{% if current_user.is_authenticated %}
 <script>
   // Warms the browser's HTTP cache with the tag-detection model in the
   // background, so by the time a gang member opens the camera it's already

@@ -1,3 +1,5 @@
+import re
+
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
@@ -14,10 +16,11 @@ from library.services.username_validator import UsernameValidator
 bp_profile = Blueprint("profile", __name__)
 username_validator = UsernameValidator()
 
+HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+
 
 def _build_profile_context(user: User) -> dict:
-    submitted = TagPoint.query.filter_by(submitted_by_id=user.id).count()
-    approved = TagPoint.query.filter_by(submitted_by_id=user.id, status="approved").count()
+    tag_count = TagPoint.query.filter_by(submitted_by_id=user.id, status="approved").count()
 
     contribution_percent = 0.0
     if user.band_id:
@@ -40,8 +43,7 @@ def _build_profile_context(user: User) -> dict:
 
     return {
         "profile_user": user,
-        "submitted": submitted,
-        "approved": approved,
+        "tag_count": tag_count,
         "contribution_percent": contribution_percent,
         "recent_tags": recent_tags,
         "visited_count": visited_count,
@@ -74,6 +76,7 @@ def visited_tags_api(username: str):
         TagVisit.query.filter_by(visitor_id=user.id)
         .options(joinedload(TagVisit.tag_point).joinedload(TagPoint.band))
         .options(joinedload(TagVisit.tag_point).joinedload(TagPoint.photo_image))
+        .options(joinedload(TagVisit.tag_point).joinedload(TagPoint.submitted_by))
         .order_by(TagVisit.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -85,8 +88,8 @@ def visited_tags_api(username: str):
             {
                 "tag_id": visit.tag_point.id,
                 "photo_url": visit.tag_point.photo_image.url if visit.tag_point.photo_image else None,
-                "band_name": visit.tag_point.band.name,
-                "band_color": visit.tag_point.band.color,
+                "band_name": visit.tag_point.band.name if visit.tag_point.band else None,
+                "band_color": visit.tag_point.band.color if visit.tag_point.band else visit.tag_point.submitted_by.color,
                 "visited_at": visit.created_at.strftime("%Y.%m.%d %H:%M"),
             }
             for visit in visits
@@ -133,6 +136,10 @@ def edit_profile():
                 flash(t("flash.unsupported_image"), "error")
                 return render_template("profile_edit.html", countries=COUNTRIES)
             current_user.banner_image_id = image.id
+
+        color = request.form.get("color", "")
+        if HEX_COLOR_PATTERN.match(color):
+            current_user.color = color
 
         current_user.bio = bio
         current_user.nationality_code = nationality_code

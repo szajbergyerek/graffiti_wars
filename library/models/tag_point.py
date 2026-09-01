@@ -9,7 +9,7 @@ class TagPoint(db.Model):
     __tablename__ = "tag_points"
 
     id = db.Column(db.Integer, primary_key=True)
-    band_id = db.Column(db.Integer, db.ForeignKey("bands.id"), nullable=False)
+    band_id = db.Column(db.Integer, db.ForeignKey("bands.id"), nullable=True)
     submitted_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     photo_image_id = db.Column(db.Integer, db.ForeignKey("images.id"), nullable=True)
     lat = db.Column(db.Float, nullable=False)

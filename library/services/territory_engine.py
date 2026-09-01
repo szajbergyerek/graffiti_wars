@@ -81,8 +81,9 @@ class TerritoryEngine:
         projector = GeoProjector(center_lat, center_lon)
         projected = {point.id: projector.to_meters(Point(point.lon, point.lat)) for point in points}
 
+        band_points = [point for point in points if point.band_id is not None]
         band_geometries, point_area_added = self._grouped_geometries(
-            points, projected, group_key=lambda point: point.band_id
+            band_points, projected, group_key=lambda point: point.band_id
         )
         for band_id, (geometry, area_km2) in band_geometries.items():
             db.session.add(

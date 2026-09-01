@@ -24,6 +24,9 @@ class User(db.Model, UserMixin):
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
     is_banned = db.Column(db.Boolean, nullable=False, default=False)
     allow_direct_messages = db.Column(db.Boolean, nullable=False, default=True)
+    # Personal accent color, same idea as a band's color. Defaults to the
+    # site's own base accent so a user who never customizes it sees no change.
+    color = db.Column(db.String(7), nullable=False, default="#ff2e6c")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     # Last location a tag submission or tag-visit log was accepted from, used

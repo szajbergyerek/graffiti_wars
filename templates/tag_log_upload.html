@@ -78,16 +78,7 @@
         formData.append("lon", userLon);
 
         const response = await fetch(logUrl, { method: "POST", body: formData });
-
-        if (response.redirected) {
-          window.location = response.url;
-          return;
-        }
-
-        const html = await response.text();
-        document.open();
-        document.write(html);
-        document.close();
+        window.location = response.url;
       }, "image/jpeg", 0.92);
     });
   }

@@ -21,6 +21,15 @@ class Image(db.Model):
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
+    # Only set for categories that run server-side tag detection ("tags",
+    # "tag_visits") - the detector's bounding box, in this image's own pixel
+    # coordinates, and its confidence for that box.
+    detection_x1 = db.Column(db.Float, nullable=True)
+    detection_y1 = db.Column(db.Float, nullable=True)
+    detection_x2 = db.Column(db.Float, nullable=True)
+    detection_y2 = db.Column(db.Float, nullable=True)
+    detection_confidence = db.Column(db.Float, nullable=True)
+
     uploaded_by = db.relationship("User", foreign_keys=[uploaded_by_id])
 
     @property

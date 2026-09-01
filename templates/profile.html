@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{% if is_own_profile %}{{ t('nav.profile') }}{% else %}{{ profile_user.username }}{% endif %} - InkTrail{% endblock %}
+{% block page_accent_color %}{% if not is_own_profile %}{{ profile_user.band.color if profile_user.band else profile_user.color }}{% endif %}{% endblock %}
 {% block header_nav %}
 {% if not is_own_profile %}
 <button type="button" class="app-header-back" onclick="history.back()">
@@ -20,7 +21,9 @@
 {% endblock %}
 {% block tab_bar %}{% if is_own_profile %}{{ super() }}{% endif %}{% endblock %}
 {% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
+  #profileMap { height: 320px; border-radius: var(--radius); border: 1px solid var(--border); }
   .profile-banner {
     height: 180px;
     background-size: cover;
@@ -83,9 +86,10 @@
   {% endif %}
 
   <div class="stat-row">
-    <div class="stat-row-item"><div class="stat-value stat-pink">{{ approved }}</div><div class="stat-label">{{ t('profile.stat_approved') }}</div></div>
+    <div class="stat-row-item"><div class="stat-value stat-pink">{{ tag_count }}</div><div class="stat-label">{{ t('profile.stat_tags') }}</div></div>
+    {% if profile_user.band_id %}
     <div class="stat-row-item"><div class="stat-value stat-yellow">{{ contribution_percent }}%</div><div class="stat-label">{{ t('profile.stat_contribution') }}</div></div>
-    <div class="stat-row-item"><div class="stat-value stat-purple">{{ submitted }}</div><div class="stat-label">{{ t('profile.stat_submitted') }}</div></div>
+    {% endif %}
     <div class="stat-row-item"><div class="stat-value stat-cyan">{{ visited_count }}</div><div class="stat-label">{{ t('profile.stat_visited') }}</div></div>
     <div class="stat-row-item"><div class="stat-value">{{ territory_area_km2 }} km2</div><div class="stat-label">{{ t('profile.stat_area') }}</div></div>
   </div>
@@ -101,6 +105,11 @@
       <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><path d="M5 4h13l-3 4 3 4H5Z"/></svg>
       {{ t('profile.my_gang_button') }}
     </a>
+    {% else %}
+    <a href="{{ url_for('bands.create_band') }}" class="quick-action">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18"/><path d="M5 4h13l-3 4 3 4H5Z"/></svg>
+      {{ t('nav.create_band') }}
+    </a>
     {% endif %}
     {% if current_user.is_admin %}
     <a href="{{ url_for('admin.queue') }}" class="quick-action">
@@ -113,16 +122,23 @@
 
   <div class="segmented mb-16" id="profileTabSwitch">
     <button type="button" class="segmented-item active" data-tab="submissions">{{ t('profile.recent_title') }}</button>
+    <button type="button" class="segmented-item" data-tab="map">{{ t('profile.map_title') }}</button>
     <button type="button" class="segmented-item" data-tab="visited">{{ t('profile.visited_title') }}</button>
   </div>
 
-  <div id="submissionsTab" class="mb-32" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px">
-    {% set ns = namespace(last_band_id=None) %}
+  <div id="profileMapTab" class="mb-32" style="display:none"><div id="profileMap"></div></div>
+
+  <div id="submissionsTab" class="mb-32" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px"
+    {% set ns = namespace(last_band_id=-1) %}
     {% for tag in recent_tags %}
-      {% if ns.last_band_id is not none and tag.band_id != ns.last_band_id %}
+      {% if ns.last_band_id != -1 and tag.band_id != ns.last_band_id %}
       <div class="flex items-center gap-8" style="grid-column:1 / -1; margin:4px 0; font-size:11px; color:var(--text-faint)">
         <span style="flex:1; height:1px; background:var(--border)"></span>
+        {% if tag.band_id %}
         {{ t('profile.former_gang_divider', band=tag.band.name) }}
+        {% else %}
+        {{ t('profile.solo_tags_divider') }}
+        {% endif %}
         <span style="flex:1; height:1px; background:var(--border)"></span>
       </div>
       {% endif %}
@@ -145,18 +161,45 @@
 {% endblock %}
 {% block extra_scripts %}
 {% if not is_own_profile or current_user.is_authenticated %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+  const profileMapTab = document.getElementById("profileMapTab");
   const submissionsTab = document.getElementById("submissionsTab");
   const visitedTab = document.getElementById("visitedTab");
+  const soloTagLabel = {{ t('feed.solo_tag') | tojson }};
   let visitedListInitialized = false;
+
+  let profileMap = null;
+  let profileMapInitialized = false;
+
+  function showProfileMap() {
+    profileMapTab.style.display = "block";
+    if (!profileMapInitialized) {
+      profileMapInitialized = true;
+      profileMap = initLiveMap("profileMap", {
+        interactive: true,
+        zoom: 13,
+        zoomControl: false,
+        userFilter: {{ profile_user.id }},
+        visitedUserId: {{ profile_user.id }},
+      });
+    } else if (profileMap) {
+      setTimeout(() => profileMap.invalidateSize(), 50);
+    }
+  }
 
   document.querySelectorAll("#profileTabSwitch .segmented-item").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll("#profileTabSwitch .segmented-item").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
 
-      if (btn.dataset.tab === "visited") {
-        submissionsTab.style.display = "none";
+      profileMapTab.style.display = "none";
+      submissionsTab.style.display = "none";
+      visitedTab.style.display = "none";
+
+      if (btn.dataset.tab === "map") {
+        showProfileMap();
+      } else if (btn.dataset.tab === "visited") {
         visitedTab.style.display = "grid";
         if (!visitedListInitialized) {
           visitedListInitialized = true;
@@ -172,7 +215,7 @@
                 <img src="${escapeHtml(visit.photo_url || "")}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:1px solid var(--border)" />
                 <div class="flex items-center gap-6" style="margin-top:4px; font-size:11px; color:${escapeHtml(visit.band_color)}">
                   <span style="width:7px;height:7px;border-radius:50%;background:${escapeHtml(visit.band_color)};flex-shrink:0"></span>
-                  <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(visit.band_name)}</span>
+                  <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(visit.band_name || soloTagLabel)}</span>
                 </div>
               `;
               return link;
@@ -180,7 +223,6 @@
           });
         }
       } else {
-        visitedTab.style.display = "none";
         submissionsTab.style.display = "grid";
       }
     });

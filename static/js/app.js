@@ -361,13 +361,34 @@ function initLiveMap(elementId, options = {}) {
     const logLink = isOwnTag
       ? ""
       : `<a href="/tags/${p.id}/log" class="btn btn-secondary btn-sm btn-block" style="margin-top:8px">${escapeHtml(logLabel)}</a>`;
+    const bandLine = p.band_id
+      ? `<a href="/bands/${p.band_id}" style="color:${escapeHtml(p.color)}; display:block; font-size:12px">${escapeHtml(p.band_name)}</a>`
+      : "";
     marker.bindPopup(
       `<a href="/users/${encodeURIComponent(p.submitted_by)}" style="font-weight:700; display:block">${escapeHtml(p.submitted_by)}</a>` +
-        `<a href="/bands/${p.band_id}" style="color:${escapeHtml(p.color)}; display:block; font-size:12px">${escapeHtml(p.band_name)}</a>` +
+        bandLine +
         `<a href="/tags/${p.id}"><img src="${escapeHtml(p.photo_url)}" style="width:190px;border-radius:6px;margin-top:6px" /></a>` +
         logLink
     );
+    if (options.openTagId != null && p.id === options.openTagId) {
+      marker.on("add", () => marker.openPopup());
+    }
     return marker;
+  }
+
+  function makeVisitedMarker(feature) {
+    const p = feature.properties;
+    const [lon, lat] = feature.geometry.coordinates;
+    return L.circleMarker([lat, lon], {
+      radius: 6,
+      weight: 2,
+      color: "#fff",
+      fillColor: p.color,
+      fillOpacity: 0.85,
+    }).bindPopup(
+      `<a href="/tags/${p.id}" style="font-weight:700; display:block">${escapeHtml(p.submitted_by)}</a>` +
+        (p.band_name ? `<span style="color:${escapeHtml(p.color)}; font-size:12px">${escapeHtml(p.band_name)}</span>` : "")
+    );
   }
 
   // Fetches only the current viewport's tags and reconciles them against
@@ -378,6 +399,7 @@ function initLiveMap(elementId, options = {}) {
     const params = new URLSearchParams();
     if (options.viewportFiltered) params.set("bbox", currentBboxParam());
     if (options.bandFilter) params.set("band_id", options.bandFilter);
+    if (options.userFilter) params.set("user_id", options.userFilter);
     const url = `/api/tags.geojson${params.toString() ? `?${params}` : ""}`;
     fetch(url)
       .then((r) => r.json())
@@ -414,23 +436,32 @@ function initLiveMap(elementId, options = {}) {
     loadTagsDebounce = setTimeout(loadTagsNow, 250);
   }
 
-  fetch(options.bandFilter ? `/api/territories.geojson?band_id=${options.bandFilter}` : "/api/territories.geojson")
+  const territoryUrl = options.userFilter
+    ? `/api/user-territories.geojson?user_id=${options.userFilter}`
+    : options.bandFilter
+    ? `/api/territories.geojson?band_id=${options.bandFilter}`
+    : "/api/territories.geojson";
+
+  fetch(territoryUrl)
     .then((r) => r.json())
     .then((data) => {
-      const filtered = filterFeatures(data, options.bandFilter);
+      const filtered = options.userFilter ? data : filterFeatures(data, options.bandFilter);
       const territoriesInteractive = options.territoriesInteractive !== false;
       const layer = L.geoJSON(filtered, {
         style: styleTerritoryFeature,
         interactive: territoriesInteractive,
         onEachFeature: (feature, featureLayer) => {
           if (!territoriesInteractive) return;
+          const p = feature.properties;
           featureLayer.bindPopup(
-            `<a href="/bands/${feature.properties.band_id}" style="font-weight:700; color:${escapeHtml(feature.properties.color)}">${escapeHtml(feature.properties.band_name)}</a><br/>${feature.properties.area_km2} km2`
+            options.userFilter
+              ? `<a href="/users/${encodeURIComponent(p.username)}" style="font-weight:700; color:${escapeHtml(p.color)}">${escapeHtml(p.username)}</a><br/>${p.area_km2} km2`
+              : `<a href="/bands/${p.band_id}" style="font-weight:700; color:${escapeHtml(p.color)}">${escapeHtml(p.band_name)}</a><br/>${p.area_km2} km2`
           );
         },
       }).addTo(map);
 
-      if (options.bandFilter && filtered.features.length && layer.getBounds().isValid()) {
+      if ((options.bandFilter || options.userFilter) && filtered.features.length && layer.getBounds().isValid()) {
         map.fitBounds(layer.getBounds(), { padding: [30, 30] });
       }
 
@@ -446,11 +477,19 @@ function initLiveMap(elementId, options = {}) {
     }
   }
 
+  if (options.visitedUserId) {
+    fetch(`/api/visited-tags.geojson?user_id=${options.visitedUserId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        data.features.forEach((feature) => makeVisitedMarker(feature).addTo(map));
+      });
+  }
+
   return map;
 }
 
 function initLocationPicker(mapElementId, latInputId, lonInputId, onSet) {
-  const map = initLiveMap(mapElementId, { interactive: true, zoom: 14, showTags: false, territoriesInteractive: false });
+  const map = initLiveMap(mapElementId, { interactive: true, zoom: 14, zoomControl: false, showTags: false, territoriesInteractive: false });
   if (!map) return;
 
   const latInput = document.getElementById(latInputId);

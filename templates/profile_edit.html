@@ -58,6 +58,11 @@
       </div>
     </div>
 
+    <div class="field">
+      <label>{{ t('profile.field_color') }}</label>
+      <input type="color" name="color" value="{{ current_user.color }}" class="color-input" />
+    </div>
+
     <div class="field mb-24">
       <label class="flex items-center justify-between gap-16" style="cursor:pointer">
         <span style="font-weight:400; color:var(--text)">{{ t('profile.field_allow_dm') }}</span>

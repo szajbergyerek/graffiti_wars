@@ -22,7 +22,7 @@ from endpoints.tutorial import bp_tutorial
 from library.config import Config
 from library.extensions import csrf, db, login_manager, oauth
 from library.i18n.countries import COUNTRY_BY_CODE
-from library.services.color_utils import contrast_shade, hex_to_rgba
+from library.services.color_utils import contrast_shade, hex_to_rgb_triplet, hex_to_rgba
 from library.services.translator import t, translator
 
 load_dotenv()
@@ -74,6 +74,7 @@ def create_app() -> Flask:
     app.jinja_env.globals["country_by_code"] = COUNTRY_BY_CODE
     app.jinja_env.globals["contrast_shade"] = contrast_shade
     app.jinja_env.globals["hex_to_rgba"] = hex_to_rgba
+    app.jinja_env.globals["hex_to_rgb_triplet"] = hex_to_rgb_triplet
 
     @app.before_request
     def _resolve_locale():
@@ -148,6 +149,19 @@ def create_app() -> Flask:
             text("ALTER TABLE bands ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE")
         )
         db.session.execute(text("ALTER TABLE bands ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP"))
+        db.session.execute(
+            text("ALTER TABLE users ADD COLUMN IF NOT EXISTS color VARCHAR(7) NOT NULL DEFAULT '#ff2e6c'")
+        )
+        # Tags no longer require a band - a user can tag on their own, so the
+        # column has to allow NULL now (it used to be NOT NULL).
+        db.session.execute(text("ALTER TABLE tag_points ALTER COLUMN band_id DROP NOT NULL"))
+        db.session.execute(text("ALTER TABLE images ADD COLUMN IF NOT EXISTS detection_x1 DOUBLE PRECISION"))
+        db.session.execute(text("ALTER TABLE images ADD COLUMN IF NOT EXISTS detection_y1 DOUBLE PRECISION"))
+        db.session.execute(text("ALTER TABLE images ADD COLUMN IF NOT EXISTS detection_x2 DOUBLE PRECISION"))
+        db.session.execute(text("ALTER TABLE images ADD COLUMN IF NOT EXISTS detection_y2 DOUBLE PRECISION"))
+        db.session.execute(
+            text("ALTER TABLE images ADD COLUMN IF NOT EXISTS detection_confidence DOUBLE PRECISION")
+        )
         db.session.commit()
 
     return app

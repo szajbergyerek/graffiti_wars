@@ -11,9 +11,11 @@
   --text-faint: #6b6878;
 
   --pink: #ff2e6c;
+  --pink-rgb: 255, 46, 108;
   --cyan: #00e0d1;
   --yellow: #ffcc00;
   --purple: #8c52ff;
+  --purple-rgb: 140, 82, 255;
   --orange: #ff7a2e;
 
   --success: #3ddc84;
@@ -1147,8 +1149,8 @@ a.list-cell, button.list-cell {
 .tab-bar-create-btn:active { transform: translateX(-50%) scale(0.94); }
 
 @keyframes fabPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 46, 108, 0.45), var(--shadow); }
-  50% { box-shadow: 0 0 0 10px rgba(255, 46, 108, 0), var(--shadow); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--pink-rgb), 0.45), var(--shadow); }
+  50% { box-shadow: 0 0 0 10px rgba(var(--pink-rgb), 0), var(--shadow); }
 }
 
 /* ---------- Entrance animations ---------- */

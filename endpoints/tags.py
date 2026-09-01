@@ -1,5 +1,6 @@
 import logging
 import math
+import os
 import threading
 from datetime import datetime, timedelta
 
@@ -20,6 +21,7 @@ from library.models.tag_visit import TagVisit
 from library.services.image_storage import ImageStorage
 from library.services.landmark_service import LandmarkService
 from library.services.settings_service import SettingsService
+from library.services.tag_detector_service import TagDetectorService
 from library.services.territory_engine import TerritoryEngine
 from library.services.translator import t
 
@@ -31,6 +33,21 @@ logger = logging.getLogger("tag_submission")
 
 # Earth's radius is a physical constant, not an admin-editable setting.
 EARTH_RADIUS_METERS = 6_371_000.0
+
+# Loaded lazily (needs current_app.config, unavailable at import time) and
+# cached for the life of the worker process - constructing an
+# InferenceSession is too slow to redo on every submission. An admin
+# replacing the model file (see endpoints/admin.py's /admin/model) only
+# takes effect after a worker restart.
+_tag_detector_service = None
+
+
+def _get_tag_detector_service() -> TagDetectorService:
+    global _tag_detector_service
+    if _tag_detector_service is None:
+        model_path = os.path.join(current_app.config["MODELS_ROOT"], "tag_detector.onnx")
+        _tag_detector_service = TagDetectorService(model_path)
+    return _tag_detector_service
 
 
 def _distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -173,6 +190,7 @@ def _refresh_landmarks_async(app, band_id: int) -> None:
 def map_view():
     lat = request.args.get("lat", type=float)
     lon = request.args.get("lon", type=float)
+    open_tag_id = request.args.get("tag_id", type=int)
     map_zoom = 13
 
     if lat is not None and lon is not None and _is_valid_coordinate(lat, lon):
@@ -180,15 +198,17 @@ def map_view():
         map_zoom = 17
     else:
         map_center = None
-        if current_user.is_authenticated and not current_user.is_civilian:
-            own_points = TagPoint.query.filter_by(band_id=current_user.band_id, status="approved").all()
-            if own_points:
-                map_center = [
-                    sum(p.lat for p in own_points) / len(own_points),
-                    sum(p.lon for p in own_points) / len(own_points),
-                ]
+        if current_user.is_authenticated:
+            last_own_tag = (
+                TagPoint.query.filter_by(submitted_by_id=current_user.id, status="approved")
+                .order_by(TagPoint.created_at.desc())
+                .first()
+            )
+            if last_own_tag:
+                map_center = [last_own_tag.lat, last_own_tag.lon]
+                map_zoom = 15
 
-    return render_template("map.html", map_center=map_center, map_zoom=map_zoom)
+    return render_template("map.html", map_center=map_center, map_zoom=map_zoom, open_tag_id=open_tag_id)
 
 
 def _get_own_pending_image(image_id: int) -> Image:
@@ -203,10 +223,6 @@ def _get_own_pending_image(image_id: int) -> Image:
 @bp_tags.route("/tags/submit", methods=["GET", "POST"])
 @login_required
 def submit_tag():
-    if current_user.is_civilian:
-        flash(t("flash.members_only"), "error")
-        return redirect(url_for("bands.list_bands"))
-
     if request.method == "POST":
         photo = request.files.get("photo")
         client_now_raw = request.form.get("client_now")
@@ -225,13 +241,28 @@ def submit_tag():
         except ValueError:
             client_now = datetime.utcnow()
 
+        # The client-side detector already gated the shutter, but that check
+        # is trivially bypassable (disabled JS, a tampered request) - re-run
+        # the same model here before the photo is ever compressed/stored, so
+        # a photo with no tag in it never makes it to disk.
+        photo_bytes = photo.read()
+        photo.seek(0)
+        detection = _get_tag_detector_service().detect(photo_bytes)
+        if detection is None:
+            flash(t("flash.no_tag_detected"), "error")
+            return render_template("tag_submit_upload.html")
+
         images_root = current_app.config["IMAGES_ROOT"]
         storage = ImageStorage(images_root)
+        subfolder = str(current_user.band_id) if current_user.band_id else f"user_{current_user.id}"
         try:
-            image = storage.save(photo, "tags", uploaded_by_id=current_user.id, subfolder=str(current_user.band_id))
+            image = storage.save(photo, "tags", uploaded_by_id=current_user.id, subfolder=subfolder)
         except ValueError:
             flash(t("flash.unsupported_image"), "error")
             return render_template("tag_submit_upload.html")
+
+        image.detection_x1, image.detection_y1, image.detection_x2, image.detection_y2 = detection["box"]
+        image.detection_confidence = detection["confidence"]
 
         # The photo comes from an in-page live camera capture and lat/lon from
         # the browser's Geolocation API, both captured right after the shutter
@@ -302,7 +333,9 @@ def finalize():
         flash(t("flash.teleport_detected"), "error")
         return jsonify({"redirect_url": url_for("tags.map_view")})
 
-    # The real AI verification model isn't ready yet - every submission is approved for now.
+    # The server-side detector already confirmed a tag is in the photo (see
+    # submit_tag()) - full band-matching AI verification isn't ready yet, so
+    # every submission that passed detection is approved for now.
     tag_point = TagPoint(
         band_id=current_user.band_id,
         submitted_by_id=current_user.id,
@@ -311,27 +344,32 @@ def finalize():
         lon=lon,
         status="approved",
         description=description or None,
-        ai_confidence=None,
+        ai_confidence=image.detection_confidence,
     )
     db.session.add(tag_point)
     _remember_location(current_user, lat, lon, now)
     db.session.commit()
 
     TerritoryEngine.from_settings().recompute_all()
-    threading.Thread(
-        target=_refresh_landmarks_async,
-        args=(current_app._get_current_object(), current_user.band_id),
-        daemon=True,
-    ).start()
-    db.session.add(
-        NewsFeedEvent(
-            event_type="tag_approved",
-            band_id=current_user.band_id,
-            message=t("feed.tag_approved", band=current_user.band.name, username=current_user.username),
+    if current_user.band_id:
+        threading.Thread(
+            target=_refresh_landmarks_async,
+            args=(current_app._get_current_object(), current_user.band_id),
+            daemon=True,
+        ).start()
+        db.session.add(
+            NewsFeedEvent(
+                event_type="tag_approved",
+                band_id=current_user.band_id,
+                message=t("feed.tag_approved", band=current_user.band.name, username=current_user.username),
+            )
         )
-    )
 
-    band_conversation = Conversation.query.filter_by(kind="band", band_id=current_user.band_id).first()
+    band_conversation = (
+        Conversation.query.filter_by(kind="band", band_id=current_user.band_id).first()
+        if current_user.band_id
+        else None
+    )
     if band_conversation is not None:
         captured_new_ground = (tag_point.area_added_km2 or 0.0) > 0
         system_text = t(
@@ -358,12 +396,7 @@ def tag_detail(tag_id: int):
     tag_point = TagPoint.query.options(
         joinedload(TagPoint.submitted_by), joinedload(TagPoint.band), joinedload(TagPoint.photo_image)
     ).get_or_404(tag_id)
-    area_added_km2 = tag_point.area_added_km2 or 0.0
-    return render_template(
-        "tag_detail.html",
-        tag_point=tag_point,
-        area_added_km2=area_added_km2,
-    )
+    return render_template("tag_detail.html", tag_point=tag_point)
 
 
 @bp_tags.route("/tags/<int:tag_id>/description", methods=["POST"])
@@ -392,11 +425,12 @@ def delete_tag(tag_id: int):
     db.session.commit()
 
     TerritoryEngine.from_settings().recompute_all()
-    threading.Thread(
-        target=_refresh_landmarks_async,
-        args=(current_app._get_current_object(), affected_band_id),
-        daemon=True,
-    ).start()
+    if affected_band_id:
+        threading.Thread(
+            target=_refresh_landmarks_async,
+            args=(current_app._get_current_object(), affected_band_id),
+            daemon=True,
+        ).start()
 
     flash(t("flash.tag_deleted"), "success")
     return redirect(url_for("tags.map_view"))
@@ -489,9 +523,7 @@ def log_visit(tag_id: int):
 
         if photo is None or photo.filename == "" or lat is None or lon is None or not _is_valid_coordinate(lat, lon):
             flash(t("flash.tag_missing_fields"), "error")
-            return render_template(
-                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
-            )
+            return redirect(url_for("tags.log_visit", tag_id=tag_id))
 
         # The location comes from the browser's Geolocation API, captured right
         # before the camera opened (see tag_log_upload.html) - re-checked here
@@ -500,36 +532,41 @@ def log_visit(tag_id: int):
             "log_visit_max_distance_meters"
         ):
             flash(t("tag.log_too_far"), "error")
-            return render_template(
-                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
-            )
+            return redirect(url_for("tags.log_visit", tag_id=tag_id))
 
         if _exceeds_rate_limit(
             TagVisit, TagVisit.visitor_id, current_user.id, "tag_visit_rate_limit_count", "tag_visit_rate_limit_window_minutes"
         ):
             flash(t("flash.rate_limited"), "error")
-            return render_template(
-                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
-            )
+            return redirect(url_for("tags.log_visit", tag_id=tag_id))
 
         now = datetime.utcnow()
         db.session.refresh(current_user._get_current_object(), with_for_update=True)
         if _is_teleport(current_user, lat, lon, now):
             flash(t("flash.teleport_detected"), "error")
-            return render_template(
-                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
-            )
+            return redirect(url_for("tags.log_visit", tag_id=tag_id))
+
+        # Same server-side re-check as tag submission - confirm a tag is
+        # actually in the photo before it's ever compressed/stored.
+        photo_bytes = photo.read()
+        photo.seek(0)
+        detection = _get_tag_detector_service().detect(photo_bytes)
+        if detection is None:
+            flash(t("flash.no_tag_detected"), "error")
+            return redirect(url_for("tags.log_visit", tag_id=tag_id))
 
         storage = ImageStorage(current_app.config["IMAGES_ROOT"])
         try:
             image = storage.save(photo, "tag_visits", uploaded_by_id=current_user.id)
         except ValueError:
             flash(t("flash.unsupported_image"), "error")
-            return render_template(
-                "tag_log_upload.html", tag_point=tag_point, max_distance_meters=settings_service.get("log_visit_max_distance_meters")
-            )
+            return redirect(url_for("tags.log_visit", tag_id=tag_id))
 
-        # Real photo matching against the tag isn't ready yet - proximity-checked visits are accepted for now.
+        image.detection_x1, image.detection_y1, image.detection_x2, image.detection_y2 = detection["box"]
+        image.detection_confidence = detection["confidence"]
+
+        # Real photo matching against the specific tag isn't ready yet -
+        # proximity-checked visits with a confirmed tag in frame are accepted for now.
         db.session.add(TagVisit(tag_point_id=tag_point.id, visitor_id=current_user.id, photo_image_id=image.id))
         _remember_location(current_user, lat, lon, now)
         db.session.commit()
@@ -542,24 +579,9 @@ def log_visit(tag_id: int):
     )
 
 
-@bp_tags.route("/tags/search", methods=["GET", "POST"])
+@bp_tags.route("/tags/search")
 @login_required
 def search_tag():
-    if request.method == "POST":
-        photo = request.files.get("photo")
-        if photo is None or photo.filename == "":
-            flash(t("flash.tag_missing_fields"), "error")
-            return render_template("tag_search_upload.html")
-
-        storage = ImageStorage(current_app.config["IMAGES_ROOT"])
-        try:
-            storage.save(photo, "tag_searches", uploaded_by_id=current_user.id)
-        except ValueError:
-            flash(t("flash.unsupported_image"), "error")
-            return render_template("tag_search_upload.html")
-
-        # The actual band-matching search isn't implemented yet - just accept the photo for now.
-        flash(t("flash.tag_search_coming_soon"), "success")
-        return redirect(url_for("tags.map_view"))
-
+    # Photo-based tag search (matching a submitted photo against known tags)
+    # isn't implemented yet - this page is a placeholder notice, not a form.
     return render_template("tag_search_upload.html")

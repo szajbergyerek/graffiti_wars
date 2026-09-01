@@ -115,7 +115,7 @@ def queue_api():
             {
                 "report_id": report.id,
                 "tag_point_id": report.tag_point.id,
-                "band_name": report.tag_point.band.name,
+                "band_name": report.tag_point.band.name if report.tag_point.band else None,
                 "reporter": report.reported_by.username,
                 "reason": report.reason,
             }
@@ -149,11 +149,12 @@ def resolve_report(report_id: int):
 
     if action == "remove_tag":
         TerritoryEngine.from_settings().recompute_all()
-        threading.Thread(
-            target=_refresh_landmarks_async,
-            args=(current_app._get_current_object(), affected_band_id),
-            daemon=True,
-        ).start()
+        if affected_band_id:
+            threading.Thread(
+                target=_refresh_landmarks_async,
+                args=(current_app._get_current_object(), affected_band_id),
+                daemon=True,
+            ).start()
 
     flash(t("flash.report_closed"), "success")
     return redirect(url_for("admin.queue"))

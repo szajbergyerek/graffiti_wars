@@ -35,6 +35,20 @@ def contrast_shade(hex_color: str) -> str:
     return shade_hex_color(hex_color, delta)
 
 
+def hex_to_rgb_triplet(hex_color: str) -> str:
+    """
+    Convert a hex color into a bare "r, g, b" triplet, usable inside a CSS
+    rgba(var(--x-rgb), alpha) expression.
+
+    param hex_color: A "#rrggbb" color string.
+
+    :return: An "r, g, b" string with no wrapping function or parentheses.
+    """
+    hex_color = hex_color.lstrip("#")
+    r, g, b = (int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+    return f"{r}, {g}, {b}"
+
+
 def hex_to_rgba(hex_color: str, alpha: float) -> str:
     """
     Convert a hex color into a CSS rgba(...) string.

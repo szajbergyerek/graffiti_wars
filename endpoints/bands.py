@@ -3,6 +3,7 @@ from datetime import datetime
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload, selectinload
 
 from library.extensions import db
@@ -60,16 +61,23 @@ def _query_bands(query_text, sort_key, scope, join_policy_filter, lat=None, lon=
         else:
             bands = []
 
-    if sort_key == "oldest":
-        bands.sort(key=lambda band: band.created_at)
-    elif sort_key == "area":
+    tag_counts = dict(
+        db.session.query(TagPoint.band_id, func.count(TagPoint.id))
+        .filter(TagPoint.status == "approved", TagPoint.band_id.isnot(None))
+        .group_by(TagPoint.band_id)
+        .all()
+    )
+
+    if sort_key == "area":
         bands.sort(key=lambda band: band.territory.area_km2 if band.territory else 0, reverse=True)
     elif sort_key == "members":
         bands.sort(key=lambda band: len(band.members), reverse=True)
+    elif sort_key == "tags":
+        bands.sort(key=lambda band: tag_counts.get(band.id, 0), reverse=True)
     else:
         bands.sort(key=lambda band: band.created_at, reverse=True)
 
-    return bands
+    return bands, tag_counts
 
 
 @bp_bands.route("/")
@@ -85,7 +93,7 @@ def list_bands():
 
 @bp_bands.route("/api/list")
 def list_bands_api():
-    bands = _query_bands(
+    bands, tag_counts = _query_bands(
         query_text=request.args.get("q", "").strip(),
         sort_key=request.args.get("sort", "newest"),
         scope=request.args.get("scope", "global"),
@@ -106,6 +114,7 @@ def list_bands_api():
                 "color": band.color,
                 "description": band.description,
                 "member_count": len(band.members),
+                "tag_count": tag_counts.get(band.id, 0),
                 "area_km2": round(band.territory.area_km2, 2) if band.territory else 0,
                 "join_policy": band.join_policy,
             }

@@ -8,6 +8,7 @@
 {% endblock %}
 {% block extra_scripts %}
 <script>
+  const soloTagLabel = {{ t('feed.solo_tag') | tojson }};
   initInfiniteList({
     container: document.getElementById("feedList"),
     emptyMessage: {{ t('home.feed_empty') | tojson }},
@@ -24,7 +25,7 @@
           <img class="avatar" src="${escapeHtml(tag.avatar_url)}" width="36" height="36" />
           <div class="feed-card-header-text">
             <div style="font-weight:700">${escapeHtml(tag.username)}</div>
-            <div style="font-size:12px; color:${escapeHtml(tag.band_color)}">${escapeHtml(tag.band_name)}</div>
+            <div style="font-size:12px; color:${escapeHtml(tag.band_color)}">${escapeHtml(tag.band_name || soloTagLabel)}</div>
           </div>
         </div>
         <img class="feed-card-photo" src="${escapeHtml(tag.photo_url)}" />

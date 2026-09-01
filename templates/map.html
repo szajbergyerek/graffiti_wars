@@ -40,6 +40,24 @@
   .map-locate-btn:disabled { opacity: 0.6; }
   .map-locate-btn.loading svg { animation: map-locate-spin 1s linear infinite; }
   @keyframes map-locate-spin { to { transform: rotate(360deg); } }
+  .map-loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(11, 11, 16, 0.35);
+    pointer-events: none;
+  }
+  .map-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, 0.25);
+    border-top-color: var(--pink);
+    animation: spin 0.8s linear infinite;
+  }
   .mini-band-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
   .mini-band-row:last-child { border-bottom: none; }
   .swatch { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
@@ -49,6 +67,10 @@
 
 {% block content %}
 <div id="mainMap"></div>
+
+<div class="map-loading-overlay" id="mapLoadingOverlay" style="display:none">
+  <div class="map-loading-spinner"></div>
+</div>
 
 <button type="button" class="map-locate-btn" id="locateMeBtn" aria-label="{{ t('map.locate_me') }}">
   <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
@@ -64,6 +86,10 @@
       <p class="mb-16">{{ t('map.no_gang_prompt') }}</p>
       <a href="{{ url_for('bands.list_bands') }}" class="btn btn-secondary btn-block btn-sm">{{ t('map.browse_gangs') }}</a>
     </div>
+    {% else %}
+    <div class="card mb-24" style="padding:16px">
+      <button type="button" class="btn btn-secondary btn-block btn-sm" onclick="toggleModal('leaveConfirmModalBackdrop')">{{ t('band.leave_button') }}</button>
+    </div>
     {% endif %}
   {% else %}
     <div class="card mb-24" style="padding:16px">
@@ -75,6 +101,25 @@
   <h4>{{ t('map.leaderboard_title') }}</h4>
   <div id="leaderboardList"></div>
 </div>
+
+{% if current_user.is_authenticated and not current_user.is_civilian %}
+<div class="modal-backdrop" id="leaveConfirmModalBackdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 style="font-size:16px; font-family:var(--font-body); font-weight:800">{{ t('band.leave_button') }}</h3>
+      <button type="button" class="modal-close" onclick="toggleModal('leaveConfirmModalBackdrop')">&times;</button>
+    </div>
+    <p class="text-muted mb-16" style="font-size:14px">{{ t('band.confirm_leave') }}</p>
+    <form method="POST" action="{{ url_for('bands.leave_band') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <div class="flex gap-8">
+        <button type="button" class="btn btn-secondary btn-block" onclick="toggleModal('leaveConfirmModalBackdrop')">{{ t('tag.cancel_button') }}</button>
+        <button type="submit" class="btn btn-danger btn-block">{{ t('band.leave_button') }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_scripts %}
@@ -135,6 +180,7 @@
     center: {{ map_center | tojson }} || undefined,
     zoomControl: false,
     viewportFiltered: true,
+    openTagId: {{ open_tag_id | tojson }},
     onTerritoriesLoaded: (territories) => {
       territories.forEach((territory) => {
         territoriesByBand[territory.band_id] = territory;
@@ -146,6 +192,24 @@
       renderLeaderboard();
     },
   });
+
+  // No specific place was requested (no "view on map" deep link, and either
+  // the visitor is a civilian or their gang has no tags yet) - default to
+  // wherever they actually are right now instead of the fixed Budapest view.
+  if (!{{ map_center | tojson }} && navigator.geolocation) {
+    const mapLoadingOverlay = document.getElementById("mapLoadingOverlay");
+    mapLoadingOverlay.style.display = "flex";
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        mapLoadingOverlay.style.display = "none";
+        liveMap.setView([position.coords.latitude, position.coords.longitude], 15);
+      },
+      () => {
+        mapLoadingOverlay.style.display = "none";
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  }
 
   initBottomSheet(
     document.getElementById("sheetToggle"),

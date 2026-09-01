@@ -8,21 +8,8 @@
 {% block header_title %}{{ t('tag.search_title') }}{% endblock %}
 {% block tab_bar %}{% endblock %}
 {% block content %}
-<div class="container section section-with-header-buttons" style="max-width:520px">
-  <p class="mb-24">{{ t('tag.search_help') }}</p>
-
-  <form method="POST" enctype="multipart/form-data" class="card">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-    <div class="field mb-24">
-      <label>{{ t('tag.search_field_photo') }}</label>
-      <label class="dropzone" for="searchPhotoInput">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <div class="dropzone-text">{{ t('tag.search_field_photo') }}</div>
-        <div class="dropzone-filename"></div>
-      </label>
-      <input type="file" id="searchPhotoInput" name="photo" accept="image/*" capture="environment" required class="sr-only" />
-    </div>
-    <button type="submit" class="btn btn-primary btn-block">{{ t('tag.search_submit_button') }}</button>
-  </form>
+<div class="container section" style="max-width:520px; padding-top:56px; min-height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:16px">
+  <svg viewBox="0 0 24 24" width="40" height="40" stroke="var(--text-faint)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+  <p class="text-muted">{{ t('tag.search_coming_soon') }}</p>
 </div>
 {% endblock %}
